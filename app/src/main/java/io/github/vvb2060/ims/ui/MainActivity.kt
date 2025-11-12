@@ -139,29 +139,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-
-@Composable
-fun Header() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFF1A73E8))
-            .padding(24.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-            Text("⚡ Turbo IMS", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Text(
-                stringResource(id = R.string.for_pixel),
-                fontSize = 14.sp,
-                color = Color(0xFFE0E0E0),
-                fontFamily = FontFamily.Monospace
-            )
-        }
-    }
-}
-
 @Composable
 fun SystemInfoCard(
     uiState: MainUiState,
