@@ -1,14 +1,26 @@
+import java.util.concurrent.TimeUnit
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+}
+
+fun String.execute(workingDir: File? = null): Process {
+    val process = ProcessBuilder(*split(" ").toTypedArray())
+        .directory(workingDir)
+        .redirectOutput(ProcessBuilder.Redirect.PIPE)
+        .redirectError(ProcessBuilder.Redirect.PIPE)
+        .start()
+    process.waitFor(1, TimeUnit.MINUTES)
+    return process
 }
 
 android {
     namespace = "io.github.vvb2060.ims"
     defaultConfig {
         applicationId = "io.github.turboims.pixel"
-        versionCode = 5
-        versionName = "3.0"
+        versionCode = Integer.parseInt("git rev-list --count HEAD".execute(null, rootDir).text.trim())
+        versionName = libs.versions.versionName.get()
     }
     buildTypes {
         release {
