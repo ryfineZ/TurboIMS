@@ -1,26 +1,28 @@
-import java.util.concurrent.TimeUnit
-
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-}
-
-fun String.runCommand(workingDir: File = file("./")): String {
-    val parts = this.split("\\s".toRegex())
-    val proc = ProcessBuilder(*parts.toTypedArray())
-        .directory(workingDir)
-        .redirectOutput(ProcessBuilder.Redirect.PIPE)
-        .redirectError(ProcessBuilder.Redirect.PIPE)
-        .start()
-
-    proc.waitFor(1, TimeUnit.MINUTES)
-    return proc.inputStream.bufferedReader().readText().trim()
+    alias(libs.plugins.kotlin.compose)
 }
 
 val packageName = "io.github.vvb2060.ims"
-val gitVersionCode: Int = "git rev-list HEAD --count".runCommand().toInt()
-val gitVersionName = "git rev-parse --short=8 HEAD".runCommand()
-val appVersionName = libs.versions.app.version.get()
+val gitVersionCode: Int = providers.exec {
+    commandLine(
+        "git",
+        "rev-list",
+        "HEAD",
+        "--count"
+    )
+}.standardOutput.asText.get().trim().toInt()
+val gitVersionName: String =
+    providers.exec {
+        commandLine(
+            "git",
+            "rev-parse",
+            "--short=8",
+            "HEAD"
+        )
+    }.standardOutput.asText.get().trim()
+val appVersionName: String = libs.versions.app.version.get()
 
 android {
     namespace = packageName

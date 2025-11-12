@@ -19,6 +19,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
@@ -41,7 +42,6 @@ fun MainScreen(
     onFeatureSwitchChange: (Feature, Boolean) -> Unit,
     onApplyConfiguration: () -> Unit,
     onSelectSim: (SimSelection) -> Unit,
-    onToggleLanguage: () -> Unit,
     openSimSelectionDialog: () -> Unit,
     dismissSimSelectionDialog: () -> Unit,
     dismissConfigAppliedDialog: () -> Unit,
@@ -54,7 +54,7 @@ fun MainScreen(
             .background(Color(0xFFF5F5F5))
             .verticalScroll(rememberScrollState())
     ) {
-        Header(onToggleLanguage)
+        Header()
         SystemInfoCard(uiState, onRequestShizukuPermission)
         SimCardSelectionCard(uiState, openSimSelectionDialog)
         FeaturesCard(uiState, onFeatureSwitchChange)
@@ -76,14 +76,14 @@ fun MainScreen(
 }
 
 @Composable
-fun Header(onToggleLanguage: () -> Unit) {
+fun Header() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(Color(0xFF1A73E8))
             .padding(24.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Space-Between
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
             Text("⚡ Turbo IMS", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White)
@@ -93,9 +93,6 @@ fun Header(onToggleLanguage: () -> Unit) {
                 color = Color(0xFFE0E0E0),
                 fontFamily = FontFamily.Monospace
             )
-        }
-        TextButton(onClick = onToggleLanguage) {
-            Text(stringResource(id = R.string.switch_language), color = Color.White, fontSize = 12.sp)
         }
     }
 }
@@ -198,7 +195,6 @@ fun SimCardSelectionCard(uiState: MainUiState, openSimSelectionDialog: () -> Uni
 
 @Composable
 fun FeaturesCard(uiState: MainUiState, onFeatureSwitchChange: (Feature, Boolean) -> Unit) {
-    val context = LocalContext.current
     Card(
         modifier = Modifier.padding(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -213,7 +209,7 @@ fun FeaturesCard(uiState: MainUiState, onFeatureSwitchChange: (Feature, Boolean)
             )
             Spacer(modifier = Modifier.height(16.dp))
 
-            Feature.values().forEachIndexed { index, feature ->
+            Feature.entries.forEachIndexed { index, feature ->
                 val featureName = when(feature) {
                     Feature.VOLTE -> R.string.volte
                     Feature.VOWIFI -> R.string.vowifi
@@ -238,8 +234,8 @@ fun FeaturesCard(uiState: MainUiState, onFeatureSwitchChange: (Feature, Boolean)
                     checked = uiState.featureSwitches[feature] ?: true,
                     onCheckedChange = { onFeatureSwitchChange(feature, it) }
                 )
-                if (index < Feature.values().size - 1) {
-                    Divider(color = Color.LightGray, thickness = 0.5.dp)
+                if (index < Feature.entries.size - 1) {
+                    HorizontalDivider(thickness = 0.5.dp, color = Color.LightGray)
                 }
             }
         }

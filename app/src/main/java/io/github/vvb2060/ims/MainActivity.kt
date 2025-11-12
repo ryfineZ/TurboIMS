@@ -1,6 +1,5 @@
 package io.github.vvb2060.ims
 
-import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -21,7 +20,6 @@ class MainActivity : ComponentActivity() {
                 onFeatureSwitchChange = viewModel::onFeatureSwitchChange,
                 onApplyConfiguration = { viewModel.onApplyConfiguration(this) },
                 onSelectSim = viewModel::onSelectSim,
-                onToggleLanguage = { viewModel.toggleLanguage(this) },
                 openSimSelectionDialog = viewModel::openSimSelectionDialog,
                 dismissSimSelectionDialog = viewModel::dismissSimSelectionDialog,
                 dismissConfigAppliedDialog = viewModel::dismissConfigAppliedDialog,
@@ -34,11 +32,5 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         viewModel.updateShizukuStatus()
-    }
-
-    override fun attachBaseContext(newBase: Context) {
-        val language = LocaleHelper.getLanguage(newBase)
-        LocaleHelper.updateResources(newBase, language)
-        super.attachBaseContext(newBase)
     }
 }

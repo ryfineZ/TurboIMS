@@ -1,5 +1,6 @@
 package io.github.vvb2060.ims
 
+import android.annotation.SuppressLint
 import android.app.IActivityManager
 import android.app.Instrumentation
 import android.content.Context
@@ -40,6 +41,7 @@ class PrivilegedProcess : Instrumentation() {
         finish(0, Bundle())
     }
 
+    @SuppressLint("MissingPermission", "NewApi")
     @Throws(Exception::class)
     private fun overrideConfig() {
         Log.i("PrivilegedProcess", "overrideConfig started")
@@ -48,16 +50,14 @@ class PrivilegedProcess : Instrumentation() {
         Log.i("PrivilegedProcess", "Starting shell permission delegation")
         am.startDelegateShellPermissionIdentity(Os.getuid(), null)
         try {
-            val cm =
-                getContext().getSystemService<CarrierConfigManager>(CarrierConfigManager::class.java)
-            val sm =
-                getContext().getSystemService<SubscriptionManager>(SubscriptionManager::class.java)
+            val cm = context.getSystemService(CarrierConfigManager::class.java)
+            val sm = context.getSystemService(SubscriptionManager::class.java)
             val values: PersistableBundle = getConfig(getContext())
 
             // 读取用户选择的 SubId
-            val prefs = getContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val selectedSubId = prefs.getInt("selected_subid", 1)
-            Log.i("PrivilegedProcess", "Selected SubId: " + selectedSubId)
+            Log.i("PrivilegedProcess", "Selected SubId: $selectedSubId")
 
             val subIds: IntArray?
             if (selectedSubId == -1) {
@@ -68,11 +68,11 @@ class PrivilegedProcess : Instrumentation() {
             } else {
                 // 只应用到选中的 SIM 卡
                 subIds = intArrayOf(selectedSubId)
-                Log.i("PrivilegedProcess", "Applying to SIM: " + selectedSubId)
+                Log.i("PrivilegedProcess", "Applying to SIM: $selectedSubId")
             }
 
             for (subId in subIds!!) {
-                Log.i("PrivilegedProcess", "Processing SubId: " + subId)
+                Log.i("PrivilegedProcess", "Processing SubId: $subId")
                 val bundle = cm.getConfigForSubId(subId, "vvb2060_config_version")
                 val currentVersion = bundle.getInt("vvb2060_config_version", 0)
                 Log.i(
@@ -90,7 +90,7 @@ class PrivilegedProcess : Instrumentation() {
                             PersistableBundle::class.java
                         )
                             .invoke(cm, subId, values)
-                        Log.i("PrivilegedProcess", "Applied config (2-param) to SubId: " + subId)
+                        Log.i("PrivilegedProcess", "Applied config (2-param) to SubId: $subId")
                     } catch (e: NoSuchMethodException) {
                         // 如果不存在两参数方法，尝试三参数方法
                         cm.javaClass.getMethod(
@@ -100,10 +100,10 @@ class PrivilegedProcess : Instrumentation() {
                             Boolean::class.javaPrimitiveType
                         )
                             .invoke(cm, subId, values, false)
-                        Log.i("PrivilegedProcess", "Applied config (3-param) to SubId: " + subId)
+                        Log.i("PrivilegedProcess", "Applied config (3-param) to SubId: $subId")
                     }
                 } else {
-                    Log.i("PrivilegedProcess", "Config already up-to-date for SubId: " + subId)
+                    Log.i("PrivilegedProcess", "Config already up-to-date for SubId: $subId")
                 }
             }
         } finally {
@@ -115,6 +115,7 @@ class PrivilegedProcess : Instrumentation() {
     companion object {
         private const val PREFS_NAME = "ims_config"
 
+        @SuppressLint("InlinedApi")
         private fun getConfig(context: Context): PersistableBundle {
             // 读取用户配置
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

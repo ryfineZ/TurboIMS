@@ -11,6 +11,8 @@
     <string name="shizuku_ready">✅ Ready</string>
     <string name="shizuku_not_running">❌ Not Running</string>
     <string name="shizuku_no_permission">⚠️ No Permission</string>
+    <string name="shizuku_checking">Checking…</string>
+    <string name="request_permission">Request Permission</string>
 
     <!-- Warning -->
     <string name="qpr2_beta3_warning">⚠️ WARNING: Android 16 QPR2 Beta 3+ restricts persistent configuration. Settings will reset after reboot and need to be reapplied.</string>

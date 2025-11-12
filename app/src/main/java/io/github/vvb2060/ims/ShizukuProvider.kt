@@ -27,7 +27,7 @@ class ShizukuProvider : ShizukuProvider() {
                 val name = ComponentName(context, PrivilegedProcess::class.java)
                 val flags = 0x00000001 // ActivityManager.INSTR_FLAG_NO_RESTART
                 val connection = UiAutomationConnection()
-                Log.i("ShizukuProvider", "Calling startInstrumentation with component: " + name)
+                Log.i("ShizukuProvider", "Calling startInstrumentation with component: $name")
                 am.startInstrumentation(name, null, flags, Bundle(), null, connection, 0, null)
                 Log.i("ShizukuProvider", "Instrumentation started successfully")
             } catch (e: Exception) {

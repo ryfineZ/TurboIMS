@@ -11,6 +11,8 @@
     <string name="shizuku_ready">✅ 已就绪</string>
     <string name="shizuku_not_running">❌ 未运行</string>
     <string name="shizuku_no_permission">⚠️ 未授权</string>
+    <string name="shizuku_checking">Checking…</string>
+    <string name="request_permission">请求权限</string>
 
     <!-- Warning -->
     <string name="qpr2_beta3_warning">⚠️ 警告：Android 16 QPR2 Beta 3+ 限制了持久化配置，重启后设置将重置，需要重新应用。</string>

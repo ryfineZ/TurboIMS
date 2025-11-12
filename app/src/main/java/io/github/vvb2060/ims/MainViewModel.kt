@@ -100,7 +100,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun loadPreferences() {
-        val featureSwitches = Feature.values().associateWith {
+        val featureSwitches = Feature.entries.associateWith {
             prefs.getBoolean(it.key, true)
         }
         _uiState.update { it.copy(featureSwitches = featureSwitches) }
@@ -154,10 +154,5 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun dismissShizukuUpdateDialog() {
         _uiState.update { it.copy(showShizukuUpdateDialog = false) }
-    }
-
-    fun toggleLanguage(activity: android.app.Activity) {
-        LocaleHelper.toggleLanguage(activity)
-        activity.recreate()
     }
 }
