@@ -86,6 +86,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.splashscreen)
     implementation(libs.lifecycle.viewmodel.ktx)
+    implementation(libs.accompanist.permissions)
 }
 
 apply(from = rootProject.file("signing.gradle"))

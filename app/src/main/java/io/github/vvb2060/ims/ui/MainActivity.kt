@@ -1,6 +1,8 @@
 package io.github.vvb2060.ims.ui
 
+import android.Manifest
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -49,6 +51,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.PermissionStatus
+import com.google.accompanist.permissions.rememberPermissionState
 import io.github.vvb2060.ims.Feature
 import io.github.vvb2060.ims.MainViewModel
 import io.github.vvb2060.ims.R
@@ -56,7 +61,7 @@ import io.github.vvb2060.ims.ShizukuStatus
 import io.github.vvb2060.ims.SimSelection
 import io.github.vvb2060.ims.ui.theme.TurbolImsTheme
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
 
@@ -68,6 +73,9 @@ class MainActivity : ComponentActivity() {
                 val context = LocalContext.current
                 val uriHandler = LocalUriHandler.current
 
+                val readPhoneStatePermission =
+                    rememberPermissionState(Manifest.permission.READ_PHONE_STATE)
+
                 val androidVersion by viewModel.androidVersion.collectAsStateWithLifecycle()
                 val shizukuStatus by viewModel.shizukuStatus.collectAsStateWithLifecycle()
                 val allSimList by viewModel.allSimList.collectAsStateWithLifecycle()
@@ -77,6 +85,16 @@ class MainActivity : ComponentActivity() {
                 var showSimSelectionDialog by remember { mutableStateOf(false) }
                 var showShizukuUpdateDialog by remember { mutableStateOf(false) }
 
+                LaunchedEffect(Unit) {
+                    if (readPhoneStatePermission.status != PermissionStatus.Granted) {
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.phone_no_permission_msg),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        readPhoneStatePermission.launchPermissionRequest()
+                    }
+                }
                 LaunchedEffect(shizukuStatus) {
                     if (shizukuStatus == ShizukuStatus.NEED_UPDATE) {
                         showShizukuUpdateDialog = true
@@ -121,8 +139,9 @@ class MainActivity : ComponentActivity() {
                         SystemInfoCard(
                             androidVersion,
                             shizukuStatus,
-                            onRefreshShizukuPermission = {
+                            onRefresh = {
                                 viewModel.updateShizukuStatus()
+                                viewModel.loadSimList()
                             },
                             onRequestShizukuPermission = {
                                 viewModel.requestShizukuPermission(0)
@@ -171,7 +190,7 @@ class MainActivity : ComponentActivity() {
 fun SystemInfoCard(
     androidVersion: String,
     shizukuStatus: ShizukuStatus,
-    onRefreshShizukuPermission: () -> Unit,
+    onRefresh: () -> Unit,
     onRequestShizukuPermission: () -> Unit,
 ) {
     Card(
@@ -211,7 +230,7 @@ fun SystemInfoCard(
                 color = shizukuStatusColor
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Button(onClick = onRefreshShizukuPermission) {
+                Button(onClick = onRefresh) {
                     Text(text = stringResource(id = R.string.refresh_permission))
                 }
                 if (shizukuStatus == ShizukuStatus.NO_PERMISSION) {

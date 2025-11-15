@@ -119,7 +119,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     @SuppressLint("MissingPermission", "NewApi")
-    private fun loadSimList() {
+    fun loadSimList() {
         viewModelScope.launch {
             val sm = application.getSystemService(SubscriptionManager::class.java)
             val list = sm.activeSubscriptionInfoList!!

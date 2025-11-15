@@ -16,6 +16,7 @@ activityCompose = "1.11.0"
 composeBom = "2025.11.00"
 androidx-splashscreen = "1.2.0"
 lifecycle = "2.9.4"
+accompanist = "0.37.3"
 
 [libraries]
 shizuku-api = { module = "dev.rikka.shizuku:api", version.ref = "shizuku" }
@@ -31,6 +32,8 @@ androidx-compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graph
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 androidx-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "androidx-splashscreen" }
 lifecycle-viewmodel-ktx = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-ktx", version.ref = "lifecycle" }
+
+accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanist" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
