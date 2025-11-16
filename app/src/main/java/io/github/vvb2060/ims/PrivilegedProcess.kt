@@ -69,7 +69,7 @@ class PrivilegedProcess : Instrumentation() {
 
             // 读取用户选择的 SubId
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            val selectedSubId = prefs.getInt("selected_subid", 1)
+            val selectedSubId = prefs.getInt("selected_subid", -1)
 
             val subIds: IntArray = if (selectedSubId == -1) {
                 // 应用到所有 SIM 卡
@@ -80,29 +80,20 @@ class PrivilegedProcess : Instrumentation() {
             }
 
             for (subId in subIds) {
-                val bundle = cm.getConfigForSubId(subId, "vvb2060_config_version")
-                val currentVersion = bundle.getInt("vvb2060_config_version", 0)
-                Log.d(TAG, "current config version: $subId=$currentVersion")
-
-                if (currentVersion != BuildConfig.VERSION_CODE) {
-                    values.putInt("vvb2060_config_version", BuildConfig.VERSION_CODE)
-                    // 使用反射调用 overrideConfig
-                    try {
-                        cm.javaClass.getMethod(
-                            "overrideConfig",
-                            Int::class.javaPrimitiveType,
-                            PersistableBundle::class.java
-                        ).invoke(cm, subId, values)
-                    } catch (_: NoSuchMethodException) {
-                        cm.javaClass.getMethod(
-                            "overrideConfig",
-                            Int::class.javaPrimitiveType,
-                            PersistableBundle::class.java,
-                            Boolean::class.javaPrimitiveType
-                        ).invoke(cm, subId, values, false)
-                    }
-                } else {
-                    Log.i(TAG, "config already up-to-date for SubId: $subId")
+                // 使用反射调用 overrideConfig
+                try {
+                    cm.javaClass.getMethod(
+                        "overrideConfig",
+                        Int::class.javaPrimitiveType,
+                        PersistableBundle::class.java
+                    ).invoke(cm, subId, values)
+                } catch (_: NoSuchMethodException) {
+                    cm.javaClass.getMethod(
+                        "overrideConfig",
+                        Int::class.javaPrimitiveType,
+                        PersistableBundle::class.java,
+                        Boolean::class.javaPrimitiveType
+                    ).invoke(cm, subId, values, false)
                 }
             }
         } finally {
