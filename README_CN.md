@@ -22,13 +22,13 @@ TurboIMS 是一个允许您在 Google Pixel 手机上启用或禁用 VoLTE（高
 ## 功能
 
 - **IMS 功能控制**: 启用或禁用以下功能：
-    - VoLTE (高清语音通话)
-    - VoWiFi (Wi-Fi 通话)
-    - VT (视频通话)
-    - VoNR (5G 语音)
-    - Cross-SIM Calling (跨卡通话)
-    - UT (补充业务)
-    - 5G NR
+  - VoLTE (高清语音通话)
+  - VoWiFi (Wi-Fi 通话)
+  - VT (视频通话)
+  - VoNR (5G 语音)
+  - Cross-SIM Calling (跨卡通话)
+  - UT (补充业务)
+  - 5G NR
 - **SIM 卡选择**: 为特定的 SIM 卡应用设置。
 - **系统信息**: 查看您的 Android 版本和 Shizuku 状态。
 
@@ -50,6 +50,14 @@ TurboIMS 是一个允许您在 Google Pixel 手机上启用或禁用 VoLTE（高
 2.  **选择 SIM 卡**: 选择您要配置的 SIM 卡。
 3.  **切换功能**: 打开或关闭所需的 IMS 功能。
 4.  **应用**: 点击“应用配置”按钮。
+
+## 权限说明
+
+- **READ_PHONE_STATE**: App 需要此权限来获取 SIM 卡列表，以便您选择要为哪张卡进行配置。您可以参考 [源代码](https://github.com/Mystery00/TurboIMS/blob/master/app/src/main/java/io/github/vvb2060/ims/MainViewModel.kt#L121-L138) 了解其具体用途。
+
+## 鸣谢
+
+- App 图标源于 [iconfont](https://www.iconfont.cn/collections/detail?cid=28924) 平台的设计，并在此基础上进行了修改以适配本项目。
 
 ## 免责声明
 

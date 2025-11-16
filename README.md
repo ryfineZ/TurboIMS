@@ -51,9 +51,17 @@ TurboIMS is a tool that allows you to enable or disable IMS features like Voice 
 3.  **Toggle Features**: Turn the desired IMS features on or off.
 4.  **Apply**: Tap the "Apply Configuration" button.
 
+## Permissions
+
+- **READ_PHONE_STATE**: This permission is required to get the list of available SIM cards, allowing you to choose which one to configure. For more details on its usage, you can refer to the [source code](https://github.com/Mystery00/TurboIMS/blob/master/app/src/main/java/io/github/vvb2060/ims/MainViewModel.kt#L121-L138).
+
+## Credits
+
+- The app icon is based on an original design from [iconfont](https://www.iconfont.cn/collections/detail?cid=28924), modified for use in this project.
+
 ## Disclaimer
 
-This application modifies your device's carrier configuration. Use it at your own risk. The developers are not responsible for any damage or loss of functionality.
+This application modifies your device'''s carrier configuration. Use it at your own risk. The developers are not responsible for any damage or loss of functionality.
 
 ## License
 
