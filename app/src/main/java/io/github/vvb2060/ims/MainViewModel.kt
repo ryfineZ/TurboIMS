@@ -9,14 +9,13 @@ import android.os.Build
 import android.telephony.SubscriptionManager
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.application
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import rikka.shizuku.Shizuku
-import androidx.core.content.edit
-import androidx.lifecycle.application
-import kotlinx.coroutines.flow.StateFlow
 
 private const val PREFS_NAME = "ims_config"
 

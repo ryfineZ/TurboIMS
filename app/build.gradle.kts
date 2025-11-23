@@ -80,7 +80,7 @@ android {
     }
     @Suppress("UnstableApiUsage")
     androidResources {
-        localeFilters.add("en-US")
+        localeFilters.add("en")
         localeFilters.add("zh-rCN")
     }
 }
