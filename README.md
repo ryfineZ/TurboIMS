@@ -30,13 +30,14 @@ TurboIMS is a tool that allows you to enable or disable IMS features like Voice 
 
 - **System Information**: Displays your device's app version, Android version, and security patch version.
 - **Shizuku Status**: Shows the current status of Shizuku and allows for refreshing permissions.
-- **SIM Card Selection**: Apply settings to a specific SIM card or all SIM cards at once.
+- **Logcat Viewer**: View and expert application logs for debugging purposes.
+- **Sim Card Selection**: Apply settings to a specific SIM card or all SIM cards at once.
 - **Customizable IMS Features**:
     - **Carrier Name**: Override the carrier name displayed on your device.
     - **VoLTE (Voice over LTE)**: Enable high-definition voice calls over 4G.
     - **VoWiFi (Wi-Fi Calling)**: Make calls over Wi-Fi networks, with options for Wi-Fi only mode.
     - **VT (Video Calling)**: Enable IMS-based video calls.
-    - **VoNR (Voice over 5G)**: Enable high-definition voice calls over 5G.
+    - **VoNR (Voice over 5G)**: Enable high-definition voice calls over 5G (Requires Android 14+).
     - **Cross-SIM Calling**: Enable dual-SIM interconnection features.
     - **UT (Supplementary Services)**: Enable call forwarding, call waiting, and other supplementary services over UT.
     - **5G NR**: Enable 5G NSA (Non-Standalone) and SA (Standalone) networks.
@@ -45,7 +46,7 @@ TurboIMS is a tool that allows you to enable or disable IMS features like Voice 
 ## Requirements
 
 - Google Pixel device
-- Android 14 or higher
+- Android 13 or higher
 - [Shizuku](https://shizuku.rikka.app/) installed and running
 
 ## Installation
@@ -61,9 +62,6 @@ TurboIMS is a tool that allows you to enable or disable IMS features like Voice 
 3.  **Toggle Features**: Turn the desired IMS features on or off.
 4.  **Apply**: Tap the "Apply Configuration" button.
 
-## Permissions
-
-- **READ_PHONE_STATE**: This permission is required to get the list of available SIM cards, allowing you to choose which one to configure. For more details on its usage, you can refer to the [source code](https://github.com/Mystery00/TurboIMS/blob/master/app/src/main/java/io/github/vvb2060/ims/MainViewModel.kt#L121-L138).
 
 ## Credits
 
