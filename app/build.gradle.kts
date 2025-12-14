@@ -42,6 +42,9 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = gitVersionCode
         versionName = appVersionName
+        ndk {
+            abiFilters.add("arm64-v8a")
+        }
     }
     packaging {
         resources {
