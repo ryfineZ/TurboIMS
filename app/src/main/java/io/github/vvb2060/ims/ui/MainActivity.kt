@@ -49,6 +49,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -66,6 +67,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.vvb2060.ims.R
 import io.github.vvb2060.ims.model.Feature
+import io.github.vvb2060.ims.model.FeatureValue
 import io.github.vvb2060.ims.model.FeatureValueType
 import io.github.vvb2060.ims.model.ShizukuStatus
 import io.github.vvb2060.ims.model.SimSelection
@@ -88,7 +90,7 @@ class MainActivity : BaseActivity() {
 
         var selectedSim by remember { mutableStateOf<SimSelection?>(null) }
         var showShizukuUpdateDialog by remember { mutableStateOf(false) }
-        val featureSwitches = remember { mutableStateMapOf<Feature, Any>() }
+        val featureSwitches = remember { mutableStateMapOf<Feature, FeatureValue>() }
 
         LaunchedEffect(shizukuStatus) {
             if (shizukuStatus == ShizukuStatus.NEED_UPDATE) {
@@ -371,8 +373,8 @@ fun SimCardSelectionCard(
 @Composable
 fun FeaturesCard(
     showCarrierName: Boolean,
-    featureSwitches: Map<Feature, Any>,
-    onFeatureSwitchChange: (Feature, Any) -> Unit,
+    featureSwitches: Map<Feature, FeatureValue>,
+    onFeatureSwitchChange: (Feature, FeatureValue) -> Unit,
     loadFeatureHistory: () -> Unit,
     resetFeatures: () -> Unit,
 ) {
@@ -419,8 +421,13 @@ fun FeaturesCard(
                         StringFeatureItem(
                             title = title,
                             description = description,
-                            initInput = (featureSwitches[feature] ?: "") as String,
-                            onInputChange = { onFeatureSwitchChange(feature, it) },
+                            initInput = (featureSwitches[feature]?.data ?: "") as String,
+                            onInputChange = {
+                                onFeatureSwitchChange(
+                                    feature,
+                                    FeatureValue(it, feature.valueType)
+                                )
+                            },
                         )
                     }
 
@@ -428,8 +435,13 @@ fun FeaturesCard(
                         BooleanFeatureItem(
                             title = title,
                             description = description,
-                            checked = (featureSwitches[feature] ?: true) as Boolean,
-                            onCheckedChange = { onFeatureSwitchChange(feature, it) }
+                            checked = (featureSwitches[feature]?.data ?: true) as Boolean,
+                            onCheckedChange = {
+                                onFeatureSwitchChange(
+                                    feature,
+                                    FeatureValue(it, feature.valueType)
+                                )
+                            }
                         )
                     }
                 }

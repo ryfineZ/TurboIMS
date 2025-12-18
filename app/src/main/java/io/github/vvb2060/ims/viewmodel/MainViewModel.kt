@@ -13,6 +13,7 @@ import io.github.vvb2060.ims.BuildConfig
 import io.github.vvb2060.ims.R
 import io.github.vvb2060.ims.ShizukuProvider
 import io.github.vvb2060.ims.model.Feature
+import io.github.vvb2060.ims.model.FeatureValue
 import io.github.vvb2060.ims.model.FeatureValueType
 import io.github.vvb2060.ims.model.ShizukuStatus
 import io.github.vvb2060.ims.model.SimSelection
@@ -77,10 +78,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun loadDefaultPreferences(): Map<Feature, Any> {
-        val featureSwitches = linkedMapOf<Feature, Any>()
+    fun loadDefaultPreferences(): Map<Feature, FeatureValue> {
+        val featureSwitches = linkedMapOf<Feature, FeatureValue>()
         for (feature in Feature.entries) {
-            featureSwitches.put(feature, feature.defaultValue)
+            featureSwitches.put(feature, FeatureValue(feature.defaultValue, feature.valueType))
         }
         return featureSwitches
     }
@@ -106,14 +107,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun onApplyConfiguration(selectedSim: SimSelection, map: Map<Feature, Any>) {
+    fun onApplyConfiguration(selectedSim: SimSelection, map: Map<Feature, FeatureValue>) {
         viewModelScope.launch {
             saveConfiguration(selectedSim.subId, map)
 
             val carrierName =
-                if (selectedSim.subId == -1) null else map[Feature.CARRIER_NAME] as String?
+                if (selectedSim.subId == -1) null else map[Feature.CARRIER_NAME]?.data as String?
             val countryISO =
-                if (selectedSim.subId == -1) null else map[Feature.COUNTRY_ISO] as String?
+                if (selectedSim.subId == -1) null else map[Feature.COUNTRY_ISO]?.data as String?
             val enableVoLTE = map.getOrDefault(Feature.VOLTE, true) as Boolean
             val enableVoWiFi = map.getOrDefault(Feature.VOWIFI, true) as Boolean
             val enableVT = map.getOrDefault(Feature.VT, true) as Boolean
@@ -146,38 +147,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun saveConfiguration(subId: Int, map: Map<Feature, Any>) {
+    private fun saveConfiguration(subId: Int, map: Map<Feature, FeatureValue>) {
         application.getSharedPreferences("sim_config_$subId", Context.MODE_PRIVATE).edit {
             clear() // Clear old config for this SIM
             map.forEach { (feature, value) ->
-                when (value) {
-                    is Boolean -> putBoolean(feature.name, value)
-                    is String -> putString(feature.name, value)
+                when (value.valueType) {
+                    FeatureValueType.BOOLEAN -> putBoolean(feature.name, value.data as Boolean)
+                    FeatureValueType.STRING -> putString(feature.name, value.data as String)
                 }
             }
         }
     }
 
-    fun loadConfiguration(subId: Int): Map<Feature, Any>? {
+    fun loadConfiguration(subId: Int): Map<Feature, FeatureValue>? {
         val prefs = application.getSharedPreferences("sim_config_$subId", Context.MODE_PRIVATE)
         if (prefs.all.isEmpty()) return null
 
-        val map = linkedMapOf<Feature, Any>()
+        val map = linkedMapOf<Feature, FeatureValue>()
         Feature.entries.forEach { feature ->
             if (prefs.contains(feature.name)) {
                 when (feature.valueType) {
                     FeatureValueType.BOOLEAN -> {
-                        map[feature] =
-                            prefs.getBoolean(feature.name, feature.defaultValue as Boolean)
+                        val data = prefs.getBoolean(feature.name, feature.defaultValue as Boolean)
+                        map[feature] = FeatureValue(data, feature.valueType)
                     }
 
                     FeatureValueType.STRING -> {
-                        map[feature] =
+                        val data =
                             prefs.getString(feature.name, feature.defaultValue as String) ?: ""
+                        map[feature] = FeatureValue(data, feature.valueType)
                     }
                 }
             } else {
-                map[feature] = feature.defaultValue
+                map[feature] = FeatureValue(feature.defaultValue, feature.valueType)
             }
         }
         return map

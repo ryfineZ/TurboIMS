@@ -1,5 +1,6 @@
 package io.github.vvb2060.ims.model
 
+import androidx.compose.runtime.Immutable
 import io.github.vvb2060.ims.R
 
 enum class Feature(
@@ -73,3 +74,9 @@ enum class Feature(
 enum class FeatureValueType {
     BOOLEAN, STRING,
 }
+
+@Immutable
+data class FeatureValue(
+    val data: Any,
+    val valueType: FeatureValueType,
+)

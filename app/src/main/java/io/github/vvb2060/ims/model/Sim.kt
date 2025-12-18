@@ -1,5 +1,9 @@
 package io.github.vvb2060.ims.model
 
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.Stable
+
+@Immutable
 data class SimSelection(
     val subId: Int,
     val displayName: String,
