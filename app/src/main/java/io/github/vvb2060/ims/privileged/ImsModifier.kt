@@ -1,5 +1,6 @@
 package io.github.vvb2060.ims.privileged
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.IActivityManager
 import android.app.Instrumentation
@@ -11,7 +12,9 @@ import android.os.ServiceManager
 import android.system.Os
 import android.telephony.CarrierConfigManager
 import android.telephony.SubscriptionManager
+import android.telephony.TelephonyManager
 import android.util.Log
+import io.github.vvb2060.ims.BuildConfig
 import io.github.vvb2060.ims.LogcatRepository
 import rikka.shizuku.Shizuku
 import rikka.shizuku.ShizukuBinderWrapper
@@ -201,7 +204,7 @@ class ImsModifier : Instrumentation() {
             arguments.remove(BUNDLE_RESET)
             val values = if (reset) null else arguments.toPersistableBundle()
             for (subId in subIds) {
-                if (LogcatRepository.isCapturing()) {
+                if (BuildConfig.DEBUG || LogcatRepository.isCapturing()) {
                     Log.i(TAG, "overrideConfig for subId $subId with values $values")
                 } else {
                     Log.d(TAG, "overrideConfig for subId $subId")

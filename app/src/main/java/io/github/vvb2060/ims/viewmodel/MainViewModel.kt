@@ -115,14 +115,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (selectedSim.subId == -1) null else map[Feature.CARRIER_NAME]?.data as String?
             val countryISO =
                 if (selectedSim.subId == -1) null else map[Feature.COUNTRY_ISO]?.data as String?
-            val enableVoLTE = map.getOrDefault(Feature.VOLTE, true) as Boolean
-            val enableVoWiFi = map.getOrDefault(Feature.VOWIFI, true) as Boolean
-            val enableVT = map.getOrDefault(Feature.VT, true) as Boolean
-            val enableVoNR = map.getOrDefault(Feature.VONR, true) as Boolean
-            val enableCrossSIM = map.getOrDefault(Feature.CROSS_SIM, true) as Boolean
-            val enableUT = map.getOrDefault(Feature.UT, true) as Boolean
-            val enable5GNR = map.getOrDefault(Feature.FIVE_G_NR, true) as Boolean
-            val enable5GThreshold = map.getOrDefault(Feature.FIVE_G_THRESHOLDS, true) as Boolean
+            val enableVoLTE = (map[Feature.VOLTE]?.data ?: true) as Boolean
+            val enableVoWiFi = (map[Feature.VOWIFI]?.data ?: true) as Boolean
+            val enableVT = (map[Feature.VT]?.data ?: true) as Boolean
+            val enableVoNR = (map[Feature.VONR]?.data ?: true) as Boolean
+            val enableCrossSIM = (map[Feature.CROSS_SIM]?.data ?: true) as Boolean
+            val enableUT = (map[Feature.UT]?.data ?: true) as Boolean
+            val enable5GNR = (map[Feature.FIVE_G_NR]?.data ?: true) as Boolean
+            val enable5GThreshold = (map[Feature.FIVE_G_THRESHOLDS]?.data ?: true) as Boolean
 
             val bundle = ImsModifier.buildBundle(
                 carrierName,

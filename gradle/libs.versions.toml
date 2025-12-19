@@ -1,6 +1,6 @@
 [versions]
 agp = "8.13.2"
-kotlin = "2.2.21"
+kotlin = "2.3.0"
 
 app-version = "3.4"
 android-compileSdk = "36"
@@ -12,9 +12,9 @@ shizuku = "13.1.5"
 
 coreKtx = "1.17.0"
 lifecycleRuntimeKtx = "2.10.0"
-activityCompose = "1.12.1"
-composeBom = "2025.12.00"
-material3 = "1.5.0-alpha10"
+activityCompose = "1.12.2"
+composeBom = "2025.12.01"
+material3 = "1.5.0-alpha11"
 androidx-splashscreen = "1.2.0"
 lifecycle = "2.10.0"
 material-icons = "1.7.8"
