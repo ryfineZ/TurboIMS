@@ -62,6 +62,7 @@ android {
             @Suppress("UnstableApiUsage")
             vcsInfo.include = false
             versionNameSuffix = ".d$gitVersionCode.$gitVersionName"
+            signingConfig = signingConfigs.getByName("sign")
         }
         release {
             isMinifyEnabled = true
