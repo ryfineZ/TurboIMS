@@ -28,6 +28,8 @@
     <string name="carrier_name_desc">自定义运营商显示的名称，为空则不修改</string>
     <string name="country_iso">运营商国家码</string>
     <string name="country_iso_desc">自定义运营商国家码，为空则不修改</string>
+    <string name="ims_user_agent">IMS User Agent</string>
+    <string name="ims_user_agent_desc">自定义 IMS User Agent 字符串，为空则不修改</string>
     <string name="volte">VoLTE（4G 语音）</string>
     <string name="volte_desc">启用 4G 高清语音通话</string>
     <string name="vowifi">VoWiFi（WiFi 通话）</string>

@@ -31,6 +31,7 @@ class ImsModifier : Instrumentation() {
         fun buildBundle(
             carrierName: String?,
             countryISO: String?,
+            imsUserAgent: String?,
             enableVoLTE: Boolean,
             enableVoWiFi: Boolean,
             enableVT: Boolean,
@@ -42,19 +43,26 @@ class ImsModifier : Instrumentation() {
         ): Bundle {
             val bundle = Bundle()
             // 运营商名称
-            if (carrierName?.isNotBlank() ?: false) {
+            if (carrierName?.isNotBlank() == true) {
                 bundle.putBoolean(CarrierConfigManager.KEY_CARRIER_NAME_OVERRIDE_BOOL, true)
                 bundle.putString(CarrierConfigManager.KEY_CARRIER_NAME_STRING, carrierName)
                 bundle.putString(CarrierConfigManager.KEY_CARRIER_CONFIG_VERSION_STRING, ":3")
             }
             // 运营商国家码
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                if (countryISO?.isNotBlank() ?: false) {
+                if (countryISO?.isNotBlank() == true) {
                     bundle.putString(
                         CarrierConfigManager.KEY_SIM_COUNTRY_ISO_OVERRIDE_STRING,
                         countryISO
                     )
                 }
+            }
+            // IMS User Agent
+            if (imsUserAgent?.isNotBlank() == true) {
+                bundle.putString(
+                    CarrierConfigManager.Ims.KEY_IMS_USER_AGENT_STRING,
+                    imsUserAgent
+                )
             }
 
             // VoLTE 配置

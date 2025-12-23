@@ -35,6 +35,7 @@ TurboIMS 是一个允许您在 Google Pixel 手机上启用或禁用 VoLTE（高
 - **可定制的 IMS 功能**:
     - **运营商名称**: 覆盖设备上显示的运营商名称。
   - **运营商国家码 (Country ISO)**: 强制修改运营商国家码 (需 Android 14+)。
+  - **IMS User Agent**: 自定义 IMS User Agent 字符串。
     - **VoLTE (高清语音通话)**: 开启 4G 高清语音通话。
     - **VoWiFi (Wi-Fi 通话)**: 通过 Wi-Fi 网络拨打电话，并可选择仅 Wi-Fi 模式。
     - **VT (视频通话)**: 开启基于 IMS 的视频通话。

@@ -148,6 +148,8 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
                 if (selectedSim.subId == -1) null else map[Feature.CARRIER_NAME]?.data as String?
             val countryISO =
                 if (selectedSim.subId == -1) null else map[Feature.COUNTRY_ISO]?.data as String?
+            val imsUserAgent =
+                if (selectedSim.subId == -1) null else map[Feature.IMS_USER_AGENT]?.data as String?
             val enableVoLTE = (map[Feature.VOLTE]?.data ?: true) as Boolean
             val enableVoWiFi = (map[Feature.VOWIFI]?.data ?: true) as Boolean
             val enableVT = (map[Feature.VT]?.data ?: true) as Boolean
@@ -160,6 +162,7 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
             val bundle = ImsModifier.buildBundle(
                 carrierName,
                 countryISO,
+                imsUserAgent,
                 enableVoLTE,
                 enableVoWiFi,
                 enableVT,

@@ -35,6 +35,7 @@ TurboIMS is a tool that allows you to enable or disable IMS features like Voice 
 - **Customizable IMS Features**:
     - **Carrier Name**: Override the carrier name displayed on your device.
   - **Country ISO**: Force modify operator country code (Requires Android 14+).
+  - **IMS User Agent**: Override the IMS User Agent string.
     - **VoLTE (Voice over LTE)**: Enable high-definition voice calls over 4G.
     - **VoWiFi (Wi-Fi Calling)**: Make calls over Wi-Fi networks, with options for Wi-Fi only mode.
     - **VT (Video Calling)**: Enable IMS-based video calls.

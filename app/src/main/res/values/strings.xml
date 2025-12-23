@@ -28,6 +28,8 @@
     <string name="carrier_name_desc">Customize carrier name</string>
     <string name="country_iso">Country ISO</string>
     <string name="country_iso_desc">Customize country ISO code</string>
+    <string name="ims_user_agent">IMS User Agent</string>
+    <string name="ims_user_agent_desc">Customize IMS User Agent string</string>
     <string name="volte">VoLTE (4G Voice)</string>
     <string name="volte_desc">Enable 4G HD voice calls</string>
     <string name="vowifi">VoWiFi (WiFi Calling)</string>

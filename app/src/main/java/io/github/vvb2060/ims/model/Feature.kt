@@ -21,6 +21,12 @@ enum class Feature(
         R.string.country_iso_desc,
         "",
     ),
+    IMS_USER_AGENT(
+        FeatureValueType.STRING,
+        R.string.ims_user_agent,
+        R.string.ims_user_agent_desc,
+        "",
+    ),
     VOLTE(
         FeatureValueType.BOOLEAN,
         R.string.volte,
