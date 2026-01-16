@@ -62,6 +62,8 @@ TurboIMS is a tool that allows you to enable or disable IMS features like Voice 
 
 ## Installation
 
+<a href="obtainium://add/https://github.com/Mystery00/TurboIMS"><img src="https://raw.githubusercontent.com/ImranR98/Obtainium/refs/heads/main/assets/graphics/badge_obtainium.png" alt="Obtainium"></a>
+
 1.  Download the latest APK from the [Releases](https://github.com/Mystery00/TurboIMS/releases) page.
 2.  Install the APK on your device.
 3.  Open the app and grant Shizuku permission.

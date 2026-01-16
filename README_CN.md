@@ -62,6 +62,8 @@ TurboIMS 是一个允许您在 Google Pixel 手机上启用或禁用 VoLTE（高
 
 ## 安装
 
+<a href="obtainium://add/https://github.com/Mystery00/TurboIMS"><img src="https://raw.githubusercontent.com/ImranR98/Obtainium/refs/heads/main/assets/graphics/badge_obtainium.png" alt="Obtainium"></a>
+
 1.  从 [Releases](https://github.com/Mystery00/TurboIMS/releases) 页面下载最新的 APK。
 2.  在您的设备上安装 APK。
 3.  打开应用并授予 Shizuku 权限。
