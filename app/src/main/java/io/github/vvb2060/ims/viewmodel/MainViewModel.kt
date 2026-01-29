@@ -12,6 +12,7 @@ import io.github.vvb2060.ims.BuildConfig
 import io.github.vvb2060.ims.R
 import io.github.vvb2060.ims.ShizukuProvider
 import io.github.vvb2060.ims.model.Feature
+import io.github.vvb2060.ims.model.FeatureConfigMapper
 import io.github.vvb2060.ims.model.FeatureValue
 import io.github.vvb2060.ims.model.FeatureValueType
 import io.github.vvb2060.ims.model.ShizukuStatus
@@ -230,6 +231,16 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
         return map
     }
 
+    suspend fun loadCurrentConfiguration(subId: Int): Map<Feature, FeatureValue>? {
+        if (subId < 0) return null
+        val bundle = ShizukuProvider.readCarrierConfig(
+            application,
+            subId,
+            FeatureConfigMapper.readKeys
+        ) ?: return null
+        return FeatureConfigMapper.fromBundle(bundle)
+    }
+
     /**
      * 重置选中 SIM 卡的配置到运营商默认状态。
      */
@@ -242,6 +253,17 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
                 toast(application.getString(R.string.config_success_reset_message))
             } else {
                 toast(application.getString(R.string.config_failed, resultMsg), false)
+            }
+        }
+    }
+
+    fun restartImsRegistration(selectedSim: SimSelection) {
+        viewModelScope.launch {
+            val resultMsg = ShizukuProvider.restartImsRegistration(application, selectedSim.subId)
+            if (resultMsg == null) {
+                toast(application.getString(R.string.ims_restart_success))
+            } else {
+                toast(application.getString(R.string.ims_restart_failed, resultMsg), false)
             }
         }
     }

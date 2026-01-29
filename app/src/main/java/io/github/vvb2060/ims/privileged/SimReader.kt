@@ -9,7 +9,9 @@ import android.os.Bundle
 import android.os.ServiceManager
 import android.system.Os
 import android.telephony.SubscriptionManager
+import android.telephony.TelephonyFrameworkInitializer
 import android.util.Log
+import com.android.internal.telephony.ISub
 import rikka.shizuku.ShizukuBinderWrapper
 
 class SimReader : Instrumentation() {
@@ -32,10 +34,12 @@ class SimReader : Instrumentation() {
         am.startDelegateShellPermissionIdentity(Os.getuid(), null)
         try {
             Log.d(TAG, "start read sim info list")
-            val subManager =
-                context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as SubscriptionManager
-            val subList = subManager.activeSubscriptionInfoList
-            val resultList = subList ?: emptyList()
+            val resultList = readByISub() ?: run {
+                val subManager =
+                    context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as SubscriptionManager
+                val subList = subManager.activeSubscriptionInfoList
+                subList ?: emptyList()
+            }
             Log.i(TAG, "read sim info list size: ${resultList.size}")
             val bundle = Bundle()
             bundle.putParcelableArrayList(BUNDLE_RESULT, ArrayList(resultList))
@@ -46,6 +50,21 @@ class SimReader : Instrumentation() {
         } finally {
             am.stopDelegateShellPermissionIdentity()
             Log.i(TAG, "stopped shell permission delegation")
+        }
+    }
+
+    private fun readByISub(): List<android.telephony.SubscriptionInfo>? {
+        return try {
+            val serviceRegisterer =
+                TelephonyFrameworkInitializer
+                    .getTelephonyServiceManager()
+                    .getSubscriptionServiceRegisterer()
+            val binder = serviceRegisterer?.get() ?: return null
+            val sub = ISub.Stub.asInterface(ShizukuBinderWrapper(binder))
+            sub.getActiveSubscriptionInfoList(null, null, true)
+        } catch (e: Throwable) {
+            Log.w(TAG, "readByISub failed, fallback to SubscriptionManager", e)
+            null
         }
     }
 }

@@ -7,7 +7,24 @@ public final class TelephonyServiceManager {
         }
     }
 
+    public ServiceRegisterer telephonyServiceRegisterer;
+    public ServiceRegisterer subscriptionServiceRegisterer;
+    public ServiceRegisterer carrierConfigServiceRegisterer;
+    public ServiceRegisterer phoneSubServiceRegisterer;
+
+    public ServiceRegisterer getTelephonyServiceRegisterer() {
+        return null;
+    }
+
     public ServiceRegisterer getSubscriptionServiceRegisterer() {
+        return null;
+    }
+
+    public ServiceRegisterer getCarrierConfigServiceRegisterer() {
+        return null;
+    }
+
+    public ServiceRegisterer getPhoneSubServiceRegisterer() {
         return null;
     }
 }

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Turbo IMS</string>
+    <string name="app_name">Turbo IMS Mod</string>
     <string name="for_pixel">forked by Mystery0</string>
 
     <!-- Main Screen -->
@@ -24,6 +24,7 @@
 
     <!-- Features -->
     <string name="features_config">Features for this apply</string>
+    <string name="tools">Tools</string>
     <string name="carrier_name">Carrier Name</string>
     <string name="carrier_name_desc">Customize carrier name</string>
     <string name="country_iso">Country ISO</string>
@@ -52,14 +53,17 @@
     <!-- Button -->
     <string name="apply_config">Apply</string>
     <string name="reset_config">Reset</string>
+    <string name="restart_ims">Restart IMS</string>
+    <string name="dump_config">Dump Config</string>
 
     <!-- Tips -->
     <string name="tip">Tips:</string>
     <string-array name="tips">
-        <item>!• The feature list switch is only used to show the content to be modified in this operation, and does not indicate the current status of related system functions.</item>
+        <item>!• When Shizuku is ready, switches reflect current system status; otherwise we fall back to saved/default configuration.</item>
         <item>• Shizuku needs to be started and authorized first.</item>
         <item>• The configuration takes effect on the selected SIM card.</item>
         <item>• Resetting the configuration will revert to the initial state, but the feature switches will not change.</item>
+        <item>• If you have signal but no data, check whether APN is empty after system updates.</item>
     </string-array>
 
     <!-- Messages -->
@@ -71,8 +75,26 @@
     <string name="config_failed">Configuration failed: %s</string>
     <string name="load_config_history_success">Loaded saved configuration history</string>
     <string name="load_config_default_success">Loaded default configuration</string>
+    <string name="load_config_current_success">Loaded current system configuration</string>
+    <string name="ims_restart_success">IMS restarted</string>
+    <string name="ims_restart_failed">IMS restart failed: %s</string>
+    <string name="select_single_sim">Please select a single SIM</string>
     <string name="update_shizuku">Please update Shizuku to the latest version</string>
     <string name="sim_list_refresh">SIM list refreshed</string>
+
+    <!-- Dump -->
+    <string name="dump_title">CarrierConfig Dump</string>
+    <string name="dump_copy">Copy</string>
+    <string name="dump_copy_success">Copied to clipboard</string>
+    <string name="dump_loading">Loading…</string>
+    <string name="dump_error">Dump failed: %s</string>
+    <string name="dump_filter_label">Filter (key/value)</string>
+
+    <!-- QS Tiles -->
+    <string name="qs_toggle_tile_title_sim_1">VoLTE Toggle (SIM 1)</string>
+    <string name="qs_toggle_tile_title_sim_2">VoLTE Toggle (SIM 2)</string>
+    <string name="qs_status_tile_title_sim_1">IMS Status (SIM 1)</string>
+    <string name="qs_status_tile_title_sim_2">IMS Status (SIM 2)</string>
 
     <!-- Logcat -->
     <string name="title_filter_log_level">Select filter log level</string>

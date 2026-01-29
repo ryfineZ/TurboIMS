@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Turbo IMS</string>
+    <string name="app_name">Turbo IMS 改版</string>
     <string name="for_pixel">forked by Mystery0</string>
 
     <!-- Main Screen -->
@@ -24,6 +24,7 @@
 
     <!-- Features -->
     <string name="features_config">本次应用功能列表</string>
+    <string name="tools">工具</string>
     <string name="carrier_name">运营商名称</string>
     <string name="carrier_name_desc">自定义运营商显示的名称，为空则不修改</string>
     <string name="country_iso">运营商国家码</string>
@@ -52,14 +53,17 @@
     <!-- Button -->
     <string name="apply_config">应用配置</string>
     <string name="reset_config">重置配置</string>
+    <string name="restart_ims">重启 IMS</string>
+    <string name="dump_config">导出配置</string>
 
     <!-- Tips -->
     <string name="tip">提示：</string>
     <string-array name="tips">
-        <item>!• 功能列表开关仅用于展示本次操作需要修改的内容，并不表示当前系统相关功能的开启情况</item>
+        <item>!• Shizuku 就绪时会读取系统当前配置；否则回退到历史/默认配置</item>
         <item>• 需要先启动并授权 Shizuku</item>
         <item>• 配置生效到选择的 SIM 卡上</item>
         <item>• 重置配置会回到一开始的状态，但是功能开关不会有变化</item>
+        <item>• 更新系统后如有信号但无流量，请先检查 APN 是否为空</item>
     </string-array>
 
     <!-- Messages -->
@@ -71,8 +75,26 @@
     <string name="config_failed">配置失败：%s</string>
     <string name="load_config_history_success">已加载保存的配置历史</string>
     <string name="load_config_default_success">已加载默认配置</string>
+    <string name="load_config_current_success">已加载系统当前配置</string>
+    <string name="ims_restart_success">IMS 已重启</string>
+    <string name="ims_restart_failed">IMS 重启失败：%s</string>
+    <string name="select_single_sim">请选中单张 SIM 卡</string>
     <string name="update_shizuku">请更新 Shizuku 到最新版本</string>
     <string name="sim_list_refresh">SIM卡列表已刷新</string>
+
+    <!-- Dump -->
+    <string name="dump_title">CarrierConfig 导出</string>
+    <string name="dump_copy">复制</string>
+    <string name="dump_copy_success">已复制到剪贴板</string>
+    <string name="dump_loading">加载中…</string>
+    <string name="dump_error">导出失败：%s</string>
+    <string name="dump_filter_label">筛选（键/值）</string>
+
+    <!-- QS Tiles -->
+    <string name="qs_toggle_tile_title_sim_1">VoLTE 开关（SIM 1）</string>
+    <string name="qs_toggle_tile_title_sim_2">VoLTE 开关（SIM 2）</string>
+    <string name="qs_status_tile_title_sim_1">IMS 状态（SIM 1）</string>
+    <string name="qs_status_tile_title_sim_2">IMS 状态（SIM 2）</string>
 
     <!-- Logcat -->
     <string name="title_filter_log_level">请选择日志过滤等级</string>

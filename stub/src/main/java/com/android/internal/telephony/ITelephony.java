@@ -8,6 +8,10 @@ public interface ITelephony extends android.os.IInterface {
 
     int getImsProvisioningInt(int subId, int key);
 
+    void resetIms(int slotIndex);
+
+    boolean isImsRegistered(int subId);
+
     abstract class Stub extends Binder implements ITelephony {
         public native static ITelephony asInterface(IBinder binder);
     }

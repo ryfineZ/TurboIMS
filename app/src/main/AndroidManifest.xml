@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <application
-        android:name=".Application"
+        android:name="io.github.vvb2060.ims.Application"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:localeConfig="@xml/locales_config"
@@ -11,7 +11,7 @@
         android:theme="@style/JetpackSplashTheme">
 
         <activity
-            android:name=".ui.MainActivity"
+            android:name="io.github.vvb2060.ims.ui.MainActivity"
             android:exported="true"
             android:theme="@style/Theme.TurbolIms">
             <intent-filter>
@@ -20,12 +20,59 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".ui.LogcatActivity"
+            android:name="io.github.vvb2060.ims.ui.LogcatActivity"
             android:exported="true"
             android:theme="@style/Theme.TurbolIms" />
+        <activity
+            android:name="io.github.vvb2060.ims.ui.DumpActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TurbolIms" />
+
+        <service
+            android:name="io.github.vvb2060.ims.tiles.SIM1VoLTETileService"
+            android:exported="true"
+            android:label="@string/qs_toggle_tile_title_sim_1"
+            android:icon="@mipmap/ic_launcher"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data android:name="android.service.quicksettings.TOGGLEABLE_TILE" android:value="true" />
+        </service>
+        <service
+            android:name="io.github.vvb2060.ims.tiles.SIM2VoLTETileService"
+            android:exported="true"
+            android:label="@string/qs_toggle_tile_title_sim_2"
+            android:icon="@mipmap/ic_launcher"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data android:name="android.service.quicksettings.TOGGLEABLE_TILE" android:value="true" />
+        </service>
+        <service
+            android:name="io.github.vvb2060.ims.tiles.SIM1IMSStatusTileService"
+            android:exported="true"
+            android:label="@string/qs_status_tile_title_sim_1"
+            android:icon="@mipmap/ic_launcher"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+        <service
+            android:name="io.github.vvb2060.ims.tiles.SIM2IMSStatusTileService"
+            android:exported="true"
+            android:label="@string/qs_status_tile_title_sim_2"
+            android:icon="@mipmap/ic_launcher"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
 
         <provider
-            android:name=".ShizukuProvider"
+            android:name="io.github.vvb2060.ims.ShizukuProvider"
             android:authorities="${applicationId}.shizuku"
             android:exported="true"
             android:multiprocess="false"
@@ -42,11 +89,27 @@
     </application>
 
     <instrumentation
-        android:name=".privileged.ImsModifier"
+        android:name="io.github.vvb2060.ims.privileged.ImsModifier"
         android:label="IMS Configurator"
         android:targetPackage="${applicationId}" />
     <instrumentation
-        android:name=".privileged.SimReader"
+        android:name="io.github.vvb2060.ims.privileged.SimReader"
         android:label="SimReader"
+        android:targetPackage="${applicationId}" />
+    <instrumentation
+        android:name="io.github.vvb2060.ims.privileged.BrokerInstrumentation"
+        android:label="BrokerInstrumentation"
+        android:targetPackage="${applicationId}" />
+    <instrumentation
+        android:name="io.github.vvb2060.ims.privileged.ConfigReader"
+        android:label="ConfigReader"
+        android:targetPackage="${applicationId}" />
+    <instrumentation
+        android:name="io.github.vvb2060.ims.privileged.ImsStatusReader"
+        android:label="ImsStatusReader"
+        android:targetPackage="${applicationId}" />
+    <instrumentation
+        android:name="io.github.vvb2060.ims.privileged.ImsResetter"
+        android:label="ImsResetter"
         android:targetPackage="${applicationId}" />
 </manifest>

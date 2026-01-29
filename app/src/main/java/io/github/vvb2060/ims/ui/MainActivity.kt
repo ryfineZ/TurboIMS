@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.rounded.Cached
 import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material.icons.rounded.SettingsBackupRestore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -48,6 +49,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -72,6 +74,7 @@ import io.github.vvb2060.ims.model.ShizukuStatus
 import io.github.vvb2060.ims.model.SimSelection
 import io.github.vvb2060.ims.model.SystemInfo
 import io.github.vvb2060.ims.viewmodel.MainViewModel
+import kotlinx.coroutines.launch
 
 class MainActivity : BaseActivity() {
     private val viewModel: MainViewModel by viewModels()
@@ -87,6 +90,7 @@ class MainActivity : BaseActivity() {
         val shizukuStatus by viewModel.shizukuStatus.collectAsStateWithLifecycle()
         val allSimList by viewModel.allSimList.collectAsStateWithLifecycle()
 
+        val scope = rememberCoroutineScope()
         var selectedSim by remember { mutableStateOf<SimSelection?>(null) }
         var showShizukuUpdateDialog by remember { mutableStateOf(false) }
         val featureSwitches = remember { mutableStateMapOf<Feature, FeatureValue>() }
@@ -101,14 +105,23 @@ class MainActivity : BaseActivity() {
                 selectedSim = allSimList.firstOrNull()
             }
         }
-        LaunchedEffect(selectedSim) {
+        LaunchedEffect(selectedSim, shizukuStatus) {
             if (selectedSim != null) {
                 featureSwitches.clear()
-                val savedConfig = viewModel.loadConfiguration(selectedSim!!.subId)
-                if (savedConfig != null) {
-                    featureSwitches.putAll(savedConfig)
+                val currentConfig = if (shizukuStatus == ShizukuStatus.READY && selectedSim!!.subId >= 0) {
+                    viewModel.loadCurrentConfiguration(selectedSim!!.subId)
                 } else {
-                    featureSwitches.putAll(viewModel.loadDefaultPreferences())
+                    null
+                }
+                if (currentConfig != null) {
+                    featureSwitches.putAll(currentConfig)
+                } else {
+                    val savedConfig = viewModel.loadConfiguration(selectedSim!!.subId)
+                    if (savedConfig != null) {
+                        featureSwitches.putAll(savedConfig)
+                    } else {
+                        featureSwitches.putAll(viewModel.loadDefaultPreferences())
+                    }
                 }
             }
         }
@@ -177,6 +190,28 @@ class MainActivity : BaseActivity() {
                     onFeatureSwitchChange = { feature, value ->
                         featureSwitches[feature] = value
                     },
+                    loadCurrentConfig = {
+                        scope.launch {
+                            if (selectedSim == null) return@launch
+                            if (shizukuStatus != ShizukuStatus.READY) {
+                                Toast.makeText(context, R.string.shizuku_not_running_msg, Toast.LENGTH_LONG).show()
+                                return@launch
+                            }
+                            if (selectedSim!!.subId < 0) {
+                                Toast.makeText(context, R.string.select_single_sim, Toast.LENGTH_SHORT).show()
+                                return@launch
+                            }
+                            featureSwitches.clear()
+                            val currentConfig = viewModel.loadCurrentConfiguration(selectedSim!!.subId)
+                            if (currentConfig != null) {
+                                featureSwitches.putAll(currentConfig)
+                                Toast.makeText(context, R.string.load_config_current_success, Toast.LENGTH_SHORT).show()
+                            } else {
+                                featureSwitches.putAll(viewModel.loadDefaultPreferences())
+                                Toast.makeText(context, R.string.load_config_default_success, Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
                     loadFeatureHistory = {
                         featureSwitches.clear()
                         val savedConfig = selectedSim?.let { viewModel.loadConfiguration(it.subId) }
@@ -192,6 +227,31 @@ class MainActivity : BaseActivity() {
                         featureSwitches.clear()
                         featureSwitches.putAll(viewModel.loadDefaultPreferences())
                         Toast.makeText(context, R.string.load_config_default_success, Toast.LENGTH_SHORT).show()
+                    }
+                )
+                ToolsCard(
+                    onRestartIms = {
+                        if (selectedSim == null || selectedSim!!.subId == -1) {
+                            Toast.makeText(context, R.string.select_single_sim, Toast.LENGTH_SHORT).show()
+                            return@ToolsCard
+                        }
+                        if (shizukuStatus != ShizukuStatus.READY) {
+                            Toast.makeText(context, R.string.shizuku_not_running_msg, Toast.LENGTH_LONG).show()
+                            return@ToolsCard
+                        }
+                        viewModel.restartImsRegistration(selectedSim!!)
+                    },
+                    onDumpConfig = {
+                        if (selectedSim == null || selectedSim!!.subId == -1) {
+                            Toast.makeText(context, R.string.select_single_sim, Toast.LENGTH_SHORT).show()
+                            return@ToolsCard
+                        }
+                        startActivity(
+                            Intent(
+                                this@MainActivity,
+                                DumpActivity::class.java
+                            ).putExtra(DumpActivity.EXTRA_SUB_ID, selectedSim!!.subId)
+                        )
                     }
                 )
                 ApplyButton(selectedSim != null) {
@@ -395,6 +455,7 @@ fun FeaturesCard(
     isSelectAllSim: Boolean,
     featureSwitches: Map<Feature, FeatureValue>,
     onFeatureSwitchChange: (Feature, FeatureValue) -> Unit,
+    loadCurrentConfig: () -> Unit,
     loadFeatureHistory: () -> Unit,
     resetFeatures: () -> Unit,
 ) {
@@ -415,6 +476,12 @@ fun FeaturesCard(
                 )
                 Spacer(modifier = Modifier.weight(1F))
                 if (!isSelectAllSim) {
+                    IconButton(onClick = loadCurrentConfig) {
+                        Icon(
+                            imageVector = Icons.Rounded.Sync,
+                            contentDescription = "Load Current"
+                        )
+                    }
                     IconButton(onClick = loadFeatureHistory) {
                         Icon(
                             imageVector = Icons.Rounded.History,
@@ -457,7 +524,7 @@ fun FeaturesCard(
                         BooleanFeatureItem(
                             title = title,
                             description = description,
-                            checked = (featureSwitches[feature]?.data ?: true) as Boolean,
+                            checked = (featureSwitches[feature]?.data ?: feature.defaultValue) as Boolean,
                             onCheckedChange = {
                                 onFeatureSwitchChange(
                                     feature,
@@ -467,7 +534,7 @@ fun FeaturesCard(
                         )
                     }
                 }
-                if (index < Feature.entries.lastIndex) {
+                if (index < showFeatures.lastIndex) {
                     HorizontalDivider(thickness = 0.5.dp)
                 }
             }
@@ -547,6 +614,44 @@ fun BooleanFeatureItem(
             Text(description, fontSize = 13.sp, color = MaterialTheme.colorScheme.outline)
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+@Composable
+fun ToolsCard(
+    onRestartIms: () -> Unit,
+    onDumpConfig: () -> Unit,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text(
+                stringResource(id = R.string.tools),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = onRestartIms,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(text = stringResource(id = R.string.restart_ims))
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Button(
+                    onClick = onDumpConfig,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                ) {
+                    Text(text = stringResource(id = R.string.dump_config))
+                }
+            }
+        }
     }
 }
 

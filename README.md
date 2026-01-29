@@ -1,98 +1,85 @@
-# TurboIMS
+# Turbo IMS Mod
 
-<p align="center">
-  <img src="app/src/main/ic_launcher-playstore.png" width="200" alt="TurboIMS Logo"/>
-</p>
+> TurboIMS 的改版分支，增加诊断与兼容能力，适配 Android 16 之后的限制。
 
-<p align="center">
-  <strong>Enable VoLTE, VoWiFi, and other IMS features on Google Pixel devices.</strong>
-</p>
+## 为什么要改
 
-<p align="center">
-    <a href="https://github.com/Mystery00/TurboIMS/releases"><img src="https://img.shields.io/github/v/release/Mystery00/TurboIMS" alt="GitHub release"></a>
-    <a href="LICENSE"><img src="https://img.shields.io/github/license/Mystery00/TurboIMS" alt="License"></a>
-    <a href="https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/Mystery00/TurboIMS"><img src="https://img.shields.io/badge/Obtainium-Import-blue?logo=obtainium&logoColor=white" alt="Obtainium"></a>
-</p>
+Android 16（尤其 2025-01 安全补丁之后）对 `CarrierConfig` 的 **persistent 覆盖**做了更严格限制：
+- 非系统应用调用 `overrideConfig(..., persistent=true)` 可能直接触发 `com.android.phone` 崩溃
+- 即使 UI 显示 5G 图标，IMS 也可能不注册，数据无法上网
 
-[简体中文](README_CN.md)
+因此本改版做了以下调整：
+1. **Broker 兜底写入**：默认使用非 persistent 写入，避免系统崩溃
+2. **读取真实系统配置**：UI 开关展示当前 CarrierConfig 实际值
+3. **一键重启 IMS**：便于配置快速生效
+4. **全量配置 Dump + 过滤**：快速诊断当前系统配置
+5. **QS 快捷图块**：VoLTE 开关 / IMS 状态快捷入口
+6. **SIM 读取增强**：加入 ISub 读取路径，兼容 eSIM/双卡
+7. **包名改为 `io.github.vvb2060.ims.mod`**：可与原版共存安装
 
-## Screenshots
+## 功能概览
 
-<p align="center">
-  <img src="docs/Screenshot1.png" width="400"/>
-  <img src="docs/Screenshot2.png" width="400"/>
-</p>
+- 系统信息、Shizuku 状态
+- SIM 选择（单卡/全卡）
+- IMS 功能开关：VoLTE / VoWiFi / VT / VoNR / UT / Cross‑SIM / 5G NR / 5G 阈值 / 显示 4G 等
+- **读取当前系统配置（同步按钮）**
+- **一键重启 IMS**
+- **Dump 当前 CarrierConfig（可过滤关键字）**
+- **QS 快捷图块**：VoLTE Toggle / IMS Status
 
-## About
+## 系统要求
 
-TurboIMS is a tool that allows you to enable or disable IMS features like Voice over LTE (VoLTE), Wi-Fi Calling (VoWiFi), Video Calling (VT), and 5G Voice (VoNR) on Google Pixel phones. It requires [Shizuku](https://shizuku.rikka.app/) to work.
+- Pixel Tensor 机型（Pixel 6/7/8/9/10 系列、Fold/Tablet）
+- Android 13+（建议 14/15/16）
+- Shizuku 运行并授权
 
-## Features
+## 构建与安装
 
-- **System Information**: Displays your device's app version, Android version, and security patch version.
-- **Shizuku Status**: Shows the current status of Shizuku and allows for refreshing permissions.
-- **Logcat Viewer**: View and expert application logs for debugging purposes.
-- **Sim Card Selection**: Apply settings to a specific SIM card or all SIM cards at once.
-- **Customizable IMS Features**:
-    - **Carrier Name**: Override the carrier name displayed on your device.
-  - **Country ISO**: Force modify operator country code (Requires Android 14+).
-  - **IMS User Agent**: Override the IMS User Agent string.
-    - **VoLTE (Voice over LTE)**: Enable high-definition voice calls over 4G.
-    - **VoWiFi (Wi-Fi Calling)**: Make calls over Wi-Fi networks, with options for Wi-Fi only mode.
-    - **VT (Video Calling)**: Enable IMS-based video calls.
-    - **VoNR (Voice over 5G)**: Enable high-definition voice calls over 5G (Requires Android 14+).
-    - **Cross-SIM Calling**: Enable dual-SIM interconnection features.
-    - **UT (Supplementary Services)**: Enable call forwarding, call waiting, and other supplementary services over UT.
-    - **5G NR**: Enable 5G NSA (Non-Standalone) and SA (Standalone) networks.
-    - **5G Signal Strength Thresholds**: Option to apply custom 5G signal strength thresholds.
-- **Configuration Persistence**: Automatically saves configuration per SIM card.
+```
+./gradlew :app:assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
 
-## Requirements
+> 注意：Debug 构建需要签名。项目已通过 `local.properties` 指定 keystore。若报签名错误，请创建本地 keystore 并写入：
 
-- **Supported Devices**: Google Pixel devices with Tensor chips (GS101, GS201, Zuma, Zuma Pro).
-    - Pixel 6, 6 Pro, 6a
-    - Pixel 7, 7 Pro, 7a
-    - Pixel 8, 8 Pro, 8a
-    - Pixel 9, 9 Pro, 9 Pro XL, 9 Pro Fold
-    - Pixel 10, 10 Pro, 10 Pro XL
-    - Pixel Fold, Pixel Tablet
-    - **Note:** Devices with Qualcomm Snapdragons (Pixel 5 and older) are NOT supported.
-- Android 13 or higher
-- [Shizuku](https://shizuku.rikka.app/) installed and running
+```
+SIGN_KEY_STORE_FILE=/path/to/your.keystore
+SIGN_KEY_STORE_PASSWORD=***
+SIGN_KEY_ALIAS=***
+SIGN_KEY_PASSWORD=***
+```
 
-## Installation
+## 使用步骤（建议顺序）
 
-<a href="https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/Mystery00/TurboIMS"><img src="https://raw.githubusercontent.com/ImranR98/Obtainium/refs/heads/main/assets/graphics/badge_obtainium.png" alt="Obtainium" height="96"></a>
+1. 确认 Shizuku 运行并授权
+2. 选择 SIM 卡
+3. 点击“同步”读取当前配置
+4. 按需开启/关闭功能并“应用”
+5. 如需立即生效，可点击“重启 IMS”
+6. 排障时进入“Dump 配置”并使用过滤
 
-1.  Download the latest APK from the [Releases](https://github.com/Mystery00/TurboIMS/releases) page.
-2.  Install the APK on your device.
-3.  Open the app and grant Shizuku permission.
+## 常见问题
 
-## Usage
+### 1. 有信号但无法上网
+系统更新后可能清空 APN。请先检查 APN 是否为空：
+- 设置 → 网络与互联网 → SIM → APN
+- 中国移动建议 APN：`cmnet`，类型 `default,supl`
 
-1.  **Check Status**: Ensure Shizuku is running and the app has permission.
-2.  **Select SIM**: Choose the SIM card you want to configure.
-3.  **Toggle Features**: Turn the desired IMS features on or off.
-4.  **Apply**: Tap the "Apply Configuration" button.
+### 2. 5G 图标有但数据不通
+Android 16 之后 CarrierConfig 覆盖可能无法真正让 IMS 注册成功。建议：
+- 查看 `*#*#4636#*#*` 的 IMS Registration 状态
+- 若为 Not registered，则需要运营商支持或更高权限（system app/root）
 
+## 免责声明
 
-## About this Project
+本应用会修改系统运营商配置，仅供学习/测试使用。请自行承担风险。
 
-This project originated as a fork of [Turbo1123/TurboIMS](https://github.com/Turbo1123/TurboIMS). However, due to various stability issues encountered during usage, the codebase has undergone a complete refactoring. This includes rewriting the core logic for SIM card reading and carrier configuration, as well as redesigning the UI and icons.
+## 致谢
 
-Major new features, such as **Carrier Name modification** and **Logcat viewer**, have also been introduced. Although the project retains the original name and fork history, the code has diverged significantly, and there are no plans to merge upstream changes. As an active user myself along with friends, I am committed to maintaining this project for as long as it serves a purpose.
-
-## Credits
-
-- **[vvb2060/Ims](https://github.com/vvb2060/Ims)**
-- **[nullbytepl/CarrierVanityName](https://github.com/nullbytepl/CarrierVanityName)**: Carrier name modification logic is derived from this project.
-- **[kyujin-cho/pixel-volte-patch](https://github.com/kyujin-cho/pixel-volte-patch)**
-- The app icon is based on an original design from [iconfont](https://www.iconfont.cn/collections/detail?cid=28924), modified for use in this project.
-
-## Disclaimer
-
-This application modifies your device's carrier configuration. Use it at your own risk. The developers are not responsible for any damage or loss of functionality.
+- vvb2060/Ims
+- kyujin-cho/pixel-volte-patch
+- nullbytepl/CarrierVanityName
 
 ## License
 
-This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
+Apache-2.0

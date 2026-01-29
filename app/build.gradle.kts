@@ -4,7 +4,8 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
-val packageName = "io.github.vvb2060.ims"
+val namespaceName = "io.github.vvb2060.ims"
+val applicationIdName = "io.github.vvb2060.ims.mod"
 val gitVersionCode: Int = providers.exec {
     commandLine(
         "git",
@@ -33,12 +34,12 @@ kotlin {
 }
 
 android {
-    namespace = packageName
+    namespace = namespaceName
     compileSdk {
         version = release(libs.versions.android.compileSdk.get().toInt())
     }
     defaultConfig {
-        applicationId = packageName
+        applicationId = applicationIdName
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = gitVersionCode
