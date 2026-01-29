@@ -1,4 +1,4 @@
-# Turbo IMS Mod
+# Turbo IMS
 
 > TurboIMS 的改版分支，增加诊断与兼容能力，适配 Android 16 之后的限制。
 
