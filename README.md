@@ -4,7 +4,7 @@
 
 ## 为什么要改
 
-Android 16（尤其 2025-01 安全补丁之后）对 `CarrierConfig` 的 **persistent 覆盖**做了更严格限制：
+Android 16（尤其 2026-01 安全补丁之后）对 `CarrierConfig` 的 **persistent 覆盖**做了更严格限制：
 - 非系统应用调用 `overrideConfig(..., persistent=true)` 可能直接触发 `com.android.phone` 崩溃
 - 即使 UI 显示 5G 图标，IMS 也可能不注册，数据无法上网
 
@@ -63,7 +63,26 @@ SIGN_KEY_PASSWORD=***
 ### 1. 有信号但无法上网
 系统更新后可能清空 APN。请先检查 APN 是否为空：
 - 设置 → 网络与互联网 → SIM → APN
-- 中国移动建议 APN：`cmnet`，类型 `default,supl`
+- MCC/MNC 一般由系统自动填写，无需手动修改
+- 中国移动（China Mobile）
+  - 名称（Name）：`CMNET`（名称可自定义，建议用此便于识别）
+  - APN：`cmnet`
+  - MCC/MNC：系统自动读取，保持默认（MNC 可能为 00/02/07）
+  - APN 类型（APN Type）：`default,supl`（如无法上网可尝试 `default,supl,net`）
+  - APN 协议（APN Protocol）：`IPv4/IPv6`
+- 中国联通（China Unicom）
+  - 名称（Name）：`3GNET`
+  - APN：`3gnet`
+  - MCC/MNC：系统自动读取，保持默认（MNC 可能为 01/06）
+  - APN 类型（APN Type）：`default,supl`
+  - APN 协议（APN Protocol）：`IPv4/IPv6`
+- 中国电信（China Telecom）
+  - 名称（Name）：`CTNET`
+  - APN：`ctnet`（注意小写）
+  - MCC/MNC：系统自动读取，保持默认（MNC 可能为 03/11）
+  - APN 类型（APN Type）：`default,supl`
+  - APN 协议（APN Protocol）：`IPv4/IPv6`
+  - 漫游协议（Roaming Protocol）：`IPv4`
 
 ### 2. 5G 图标有但数据不通
 Android 16 之后 CarrierConfig 覆盖可能无法真正让 IMS 注册成功。建议：
