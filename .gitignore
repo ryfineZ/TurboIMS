@@ -11,3 +11,4 @@ local.properties
 /app/release/
 GEMINI.md
 .agentdocs
+turboims-debug.keystore
