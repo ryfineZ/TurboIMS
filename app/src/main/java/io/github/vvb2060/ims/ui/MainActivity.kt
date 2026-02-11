@@ -126,6 +126,11 @@ private data class UpdateDialogState(
     val latest: ReleaseInfo,
 )
 
+private data class ApplyResultDialogState(
+    val success: Boolean,
+    val message: String,
+)
+
 private data class CountryIsoOption(
     val key: String,
     val isoCode: String?,
@@ -205,8 +210,10 @@ class MainActivity : BaseActivity() {
         var pendingAutoSelectSimAfterReady by remember { mutableStateOf(false) }
         var imsRegistrationStatus by remember { mutableStateOf<Boolean?>(null) }
         var imsRegistrationLoading by remember { mutableStateOf(false) }
+        var applyingConfiguration by remember { mutableStateOf(false) }
         var checkingUpdate by remember { mutableStateOf(false) }
         var updateDialogState by remember { mutableStateOf<UpdateDialogState?>(null) }
+        var applyResultDialogState by remember { mutableStateOf<ApplyResultDialogState?>(null) }
         val featureSwitches = remember { mutableStateMapOf<Feature, FeatureValue>() }
 
         LaunchedEffect(shizukuStatus) {
@@ -302,7 +309,18 @@ class MainActivity : BaseActivity() {
                     shizukuStatus,
                     onRefresh = {
                         viewModel.updateShizukuStatus()
-                        viewModel.loadSimList()
+                        if (shizukuStatus == ShizukuStatus.READY) {
+                            scope.launch {
+                                val hasValidSim = viewModel.refreshSimListNow()
+                                val messageRes = if (hasValidSim) {
+                                    R.string.sim_list_refresh
+                                } else {
+                                    R.string.sim_list_refresh_failed_restart_shizuku
+                                }
+                                val duration = if (hasValidSim) Toast.LENGTH_SHORT else Toast.LENGTH_LONG
+                                Toast.makeText(context, messageRes, duration).show()
+                            }
+                        }
                     },
                     onRequestShizukuPermission = {
                         viewModel.requestShizukuPermission(0)
@@ -351,8 +369,16 @@ class MainActivity : BaseActivity() {
                     SimCardSelectionCard(selectedSim, allSimList, onSelectSim = {
                         selectedSim = it
                     }, onRefreshSimList = {
-                        viewModel.loadSimList()
-                        Toast.makeText(context, R.string.sim_list_refresh, Toast.LENGTH_SHORT).show()
+                        scope.launch {
+                            val hasValidSim = viewModel.refreshSimListNow()
+                            val messageRes = if (hasValidSim) {
+                                R.string.sim_list_refresh
+                            } else {
+                                R.string.sim_list_refresh_failed_restart_shizuku
+                            }
+                            val duration = if (hasValidSim) Toast.LENGTH_SHORT else Toast.LENGTH_LONG
+                            Toast.makeText(context, messageRes, duration).show()
+                        }
                     })
                     FeaturesCard(
                         isSelectAllSim = selectedSim?.subId == -1,
@@ -420,7 +446,26 @@ class MainActivity : BaseActivity() {
                                 Toast.makeText(context, R.string.shizuku_not_running_msg, Toast.LENGTH_LONG).show()
                                 return@MainActionButtons
                             }
-                            viewModel.onApplyConfiguration(sim, featureSwitches)
+                            if (applyingConfiguration) {
+                                return@MainActionButtons
+                            }
+                            scope.launch {
+                                applyingConfiguration = true
+                                Toast.makeText(context, R.string.config_apply_in_progress, Toast.LENGTH_SHORT).show()
+                                val resultMsg = viewModel.onApplyConfiguration(sim, featureSwitches)
+                                applyingConfiguration = false
+                                applyResultDialogState = if (resultMsg == null) {
+                                    ApplyResultDialogState(
+                                        success = true,
+                                        message = context.getString(R.string.config_apply_success_message)
+                                    )
+                                } else {
+                                    ApplyResultDialogState(
+                                        success = false,
+                                        message = context.getString(R.string.config_failed, resultMsg)
+                                    )
+                                }
+                            }
                         },
                         onResetConfiguration = {
                             val sim = selectedSim
@@ -461,7 +506,8 @@ class MainActivity : BaseActivity() {
                                     DumpActivity::class.java
                                 ).putExtra(DumpActivity.EXTRA_SUB_ID, sim.subId)
                             )
-                        }
+                        },
+                        applyingConfiguration = applyingConfiguration
                     )
                 }
                 Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
@@ -500,6 +546,31 @@ class MainActivity : BaseActivity() {
                         dismissButton = {
                             TextButton(onClick = { updateDialogState = null }) {
                                 Text(stringResource(id = android.R.string.cancel))
+                            }
+                        }
+                    )
+                }
+                if (applyResultDialogState != null) {
+                    val state = applyResultDialogState!!
+                    AlertDialog(
+                        onDismissRequest = { applyResultDialogState = null },
+                        title = {
+                            Text(
+                                text = stringResource(
+                                    if (state.success) {
+                                        R.string.config_apply_success_title
+                                    } else {
+                                        R.string.config_apply_failed_title
+                                    }
+                                )
+                            )
+                        },
+                        text = {
+                            Text(text = state.message)
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { applyResultDialogState = null }) {
+                                Text(stringResource(id = android.R.string.ok))
                             }
                         }
                     )
@@ -1383,6 +1454,7 @@ fun MainActionButtons(
     onApplyConfiguration: () -> Unit,
     onResetConfiguration: () -> Unit,
     onDumpConfig: () -> Unit,
+    applyingConfiguration: Boolean = false,
 ) {
     Row(
         modifier = Modifier
@@ -1392,14 +1464,24 @@ fun MainActionButtons(
     ) {
         Button(
             onClick = onApplyConfiguration,
+            enabled = !applyingConfiguration,
             modifier = Modifier
                 .weight(1f)
                 .height(52.dp),
         ) {
-            Text(text = stringResource(id = R.string.apply_config))
+            Text(
+                text = stringResource(
+                    id = if (applyingConfiguration) {
+                        R.string.apply_config_running
+                    } else {
+                        R.string.apply_config
+                    }
+                )
+            )
         }
         Button(
             onClick = onResetConfiguration,
+            enabled = !applyingConfiguration,
             modifier = Modifier
                 .weight(1f)
                 .height(52.dp),
@@ -1409,6 +1491,7 @@ fun MainActionButtons(
         }
         Button(
             onClick = onDumpConfig,
+            enabled = !applyingConfiguration,
             modifier = Modifier
                 .weight(1f)
                 .height(52.dp),

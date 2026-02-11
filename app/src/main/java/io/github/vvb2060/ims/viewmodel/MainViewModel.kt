@@ -20,6 +20,7 @@ import io.github.vvb2060.ims.model.ShizukuStatus
 import io.github.vvb2060.ims.model.SimSelection
 import io.github.vvb2060.ims.model.SystemInfo
 import io.github.vvb2060.ims.privileged.ImsModifier
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -80,7 +81,14 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
                 else -> ShizukuStatus.READY
             }
             _shizukuStatus.value = status
-            if (status == ShizukuStatus.READY && previousStatus != ShizukuStatus.READY) {
+            if (
+                status == ShizukuStatus.READY &&
+                (
+                    previousStatus != ShizukuStatus.READY ||
+                        _allSimList.value.isEmpty() ||
+                        _allSimList.value.all { it.subId == -1 }
+                    )
+            ) {
                 loadSimList()
             }
         }
@@ -117,19 +125,44 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
      */
     fun loadSimList() {
         viewModelScope.launch {
-            val simInfoList = ShizukuProvider.readSimInfoList(application)
-            val primarySubId = resolvePrimarySubId()
-            val sortedSimList = simInfoList.sortedWith(
-                compareByDescending<SimSelection> { it.subId == primarySubId }
-                    .thenBy { it.simSlotIndex }
-                    .thenBy { it.subId }
-            )
-            val resultList = sortedSimList.toMutableList()
-            // 添加默认的 "所有 SIM 卡" 选项 (subId = -1) 到末尾
-            val title = application.getString(R.string.all_sim)
-            resultList.add(SimSelection(-1, "", "", -1, title))
-            _allSimList.value = resultList
+            loadSimListInternal()
         }
+    }
+
+    /**
+     * 手动刷新 SIM 列表并返回是否读取到了至少 1 张真实 SIM。
+     * 返回 false 代表当前只剩“所有 SIM”占位项。
+     */
+    suspend fun refreshSimListNow(): Boolean = loadSimListInternal()
+
+    private suspend fun loadSimListInternal(): Boolean {
+        val shizukuReady =
+            Shizuku.pingBinder() &&
+                Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+        val retryCount = if (shizukuReady) 3 else 1
+        var simInfoList: List<SimSelection> = emptyList()
+        for (attempt in 0 until retryCount) {
+            simInfoList = ShizukuProvider.readSimInfoList(application)
+            if (simInfoList.isNotEmpty()) {
+                break
+            }
+            if (attempt < retryCount - 1) {
+                delay(250)
+            }
+        }
+
+        val primarySubId = resolvePrimarySubId()
+        val sortedSimList = simInfoList.sortedWith(
+            compareByDescending<SimSelection> { it.subId == primarySubId }
+                .thenBy { it.simSlotIndex }
+                .thenBy { it.subId }
+        )
+        val resultList = sortedSimList.toMutableList()
+        // 添加默认的 "所有 SIM 卡" 选项 (subId = -1) 到末尾
+        val title = application.getString(R.string.all_sim)
+        resultList.add(SimSelection(-1, "", "", -1, title))
+        _allSimList.value = resultList
+        return simInfoList.isNotEmpty()
     }
 
     private fun resolvePrimarySubId(): Int {
@@ -161,53 +194,49 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
      * 应用 IMS 配置到选定的 SIM 卡。
      * 此操作会调用 ShizukuProvider 进行特权操作，并保存当前配置到本地。
      */
-    fun onApplyConfiguration(selectedSim: SimSelection, map: Map<Feature, FeatureValue>) {
-        viewModelScope.launch {
-            // 构建传递给底层 ImsModifier 的配置 Bundle
-            val carrierName =
-                if (selectedSim.subId == -1) null else map[Feature.CARRIER_NAME]?.data as String?
-            val countryISO =
-                if (selectedSim.subId == -1) null else map[Feature.COUNTRY_ISO]?.data as String?
-            val imsUserAgent =
-                if (selectedSim.subId == -1) null else map[Feature.IMS_USER_AGENT]?.data as String?
-            val enableVoLTE = (map[Feature.VOLTE]?.data ?: true) as Boolean
-            val enableVoWiFi = (map[Feature.VOWIFI]?.data ?: true) as Boolean
-            val enableVT = (map[Feature.VT]?.data ?: true) as Boolean
-            val enableVoNR = (map[Feature.VONR]?.data ?: true) as Boolean
-            val enableCrossSIM = (map[Feature.CROSS_SIM]?.data ?: true) as Boolean
-            val enableUT = (map[Feature.UT]?.data ?: true) as Boolean
-            val enable5GNR = (map[Feature.FIVE_G_NR]?.data ?: true) as Boolean
-            val enable5GThreshold = (map[Feature.FIVE_G_THRESHOLDS]?.data ?: true) as Boolean
-            val enable5GPlusIcon = (map[Feature.FIVE_G_PLUS_ICON]?.data ?: true) as Boolean
-            val enableShow4GForLTE = (map[Feature.SHOW_4G_FOR_LTE]?.data ?: false) as Boolean
+    suspend fun onApplyConfiguration(selectedSim: SimSelection, map: Map<Feature, FeatureValue>): String? {
+        // 构建传递给底层 ImsModifier 的配置 Bundle
+        val carrierName =
+            if (selectedSim.subId == -1) null else map[Feature.CARRIER_NAME]?.data as String?
+        val countryISO =
+            if (selectedSim.subId == -1) null else map[Feature.COUNTRY_ISO]?.data as String?
+        val imsUserAgent =
+            if (selectedSim.subId == -1) null else map[Feature.IMS_USER_AGENT]?.data as String?
+        val enableVoLTE = (map[Feature.VOLTE]?.data ?: true) as Boolean
+        val enableVoWiFi = (map[Feature.VOWIFI]?.data ?: true) as Boolean
+        val enableVT = (map[Feature.VT]?.data ?: true) as Boolean
+        val enableVoNR = (map[Feature.VONR]?.data ?: true) as Boolean
+        val enableCrossSIM = (map[Feature.CROSS_SIM]?.data ?: true) as Boolean
+        val enableUT = (map[Feature.UT]?.data ?: true) as Boolean
+        val enable5GNR = (map[Feature.FIVE_G_NR]?.data ?: true) as Boolean
+        val enable5GThreshold = (map[Feature.FIVE_G_THRESHOLDS]?.data ?: true) as Boolean
+        val enable5GPlusIcon = (map[Feature.FIVE_G_PLUS_ICON]?.data ?: true) as Boolean
+        val enableShow4GForLTE = (map[Feature.SHOW_4G_FOR_LTE]?.data ?: false) as Boolean
 
-            val bundle = ImsModifier.buildBundle(
-                carrierName,
-                countryISO,
-                imsUserAgent,
-                enableVoLTE,
-                enableVoWiFi,
-                enableVT,
-                enableVoNR,
-                enableCrossSIM,
-                enableUT,
-                enable5GNR,
-                enable5GThreshold,
-                enable5GPlusIcon,
-                enableShow4GForLTE
-            )
-            bundle.putInt(ImsModifier.BUNDLE_SELECT_SIM_ID, selectedSim.subId)
+        val bundle = ImsModifier.buildBundle(
+            carrierName,
+            countryISO,
+            imsUserAgent,
+            enableVoLTE,
+            enableVoWiFi,
+            enableVT,
+            enableVoNR,
+            enableCrossSIM,
+            enableUT,
+            enable5GNR,
+            enable5GThreshold,
+            enable5GPlusIcon,
+            enableShow4GForLTE
+        )
+        bundle.putInt(ImsModifier.BUNDLE_SELECT_SIM_ID, selectedSim.subId)
 
-            // 调用 Shizuku 服务进行实际修改
-            val resultMsg = ShizukuProvider.overrideImsConfig(application, bundle)
-            if (resultMsg == null) {
-                // 仅在应用成功后保存配置，避免本地状态与系统状态不一致
-                saveConfiguration(selectedSim.subId, map)
-                toast(application.getString(R.string.config_success_message))
-            } else {
-                toast(application.getString(R.string.config_failed, resultMsg), false)
-            }
+        // 调用 Shizuku 服务进行实际修改
+        val resultMsg = ShizukuProvider.overrideImsConfig(application, bundle)
+        if (resultMsg == null) {
+            // 仅在应用成功后保存配置，避免本地状态与系统状态不一致
+            saveConfiguration(selectedSim.subId, map)
         }
+        return resultMsg
     }
 
     /**

@@ -80,6 +80,7 @@
 
     <!-- Button -->
     <string name="apply_config">Apply</string>
+    <string name="apply_config_running">Applying…</string>
     <string name="reset_config">Reset</string>
     <string name="restart_ims">Restart IMS</string>
     <string name="dump_config">Dump Config</string>
@@ -91,13 +92,18 @@
         <item>• After Shizuku is ready, current system configuration is loaded automatically into switches and inputs.</item>
         <item>• Configuration applies to the selected SIM card; choosing \"All SIM\" applies in batch.</item>
         <item>• After a successful reset, current system state is synced automatically.</item>
-        <item>• If you have signal but no data, check whether APN is empty after system updates.</item>
+        <item>• If you have signal but no data, check whether Access Point Name (APN) is empty after system updates.</item>
     </string-array>
 
     <!-- Messages -->
     <string name="shizuku_not_running_msg">Shizuku is not running, please start Shizuku first</string>
     <string name="shizuku_no_permission_msg">Please grant Shizuku permission</string>
     <string name="phone_no_permission_msg">Please grant permission to read SIM card</string>
+    <string name="sim_list_refresh_failed_restart_shizuku">SIM list read failed, please restart Shizuku service and refresh again</string>
+    <string name="config_apply_in_progress">Applying configuration…</string>
+    <string name="config_apply_success_title">Configuration Applied</string>
+    <string name="config_apply_success_message">Configuration has been applied.\nIf Wi-Fi is connected, turn off Wi-Fi, then check the 5G/5G+ icon and test mobile data.</string>
+    <string name="config_apply_failed_title">Apply Failed</string>
     <string name="config_success_message">Configuration applied!</string>
     <string name="config_success_reset_message">Configuration reset!</string>
     <string name="config_failed">Configuration failed: %s</string>

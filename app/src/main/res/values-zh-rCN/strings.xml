@@ -80,6 +80,7 @@
 
     <!-- Button -->
     <string name="apply_config">应用</string>
+    <string name="apply_config_running">应用中…</string>
     <string name="reset_config">重置</string>
     <string name="restart_ims">重启 IMS</string>
     <string name="dump_config">导出</string>
@@ -91,13 +92,18 @@
         <item>• 进入可操作界面后会自动读取当前系统配置并同步到开关和输入项</item>
         <item>• 配置会生效到当前选中的 SIM 卡；选择“所有SIM”会批量应用</item>
         <item>• 重置配置成功后会自动同步当前系统状态</item>
-        <item>• 更新系统后如有信号但无流量，请先检查 APN 是否为空</item>
+        <item>• 更新系统后如有信号但无流量，请先检查接入点（APN）是否为空</item>
     </string-array>
 
     <!-- Messages -->
     <string name="shizuku_not_running_msg">Shizuku 未运行，请先启动 Shizuku</string>
     <string name="shizuku_no_permission_msg">请授予 Shizuku 权限</string>
     <string name="phone_no_permission_msg">请授予读取SIM卡权限</string>
+    <string name="sim_list_refresh_failed_restart_shizuku">SIM卡读取失败，请重启 Shizuku 服务后再刷新</string>
+    <string name="config_apply_in_progress">正在应用配置…</string>
+    <string name="config_apply_success_title">配置已应用</string>
+    <string name="config_apply_success_message">配置已生效。\n如当前连接 Wi-Fi，请先关闭 Wi-Fi 再观察 5G/5G+ 图标并测试移动数据。</string>
+    <string name="config_apply_failed_title">应用失败</string>
     <string name="config_success_message">配置已应用！</string>
     <string name="config_success_reset_message">配置已重置！</string>
     <string name="config_failed">配置失败：%s</string>
