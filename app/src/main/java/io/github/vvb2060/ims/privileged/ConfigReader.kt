@@ -1,5 +1,6 @@
 package io.github.vvb2060.ims.privileged
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.IActivityManager
 import android.app.Instrumentation
@@ -22,6 +23,7 @@ class ConfigReader : Instrumentation() {
         const val BUNDLE_DUMP_TEXT = "dump_text"
     }
 
+    @SuppressLint("MissingPermission")
     override fun onCreate(arguments: Bundle?) {
         super.onCreate(arguments)
         if (arguments == null) {

@@ -75,6 +75,12 @@ enum class Feature(
         R.string._5g_thresholds_desc,
         true,
     ),
+    FIVE_G_PLUS_ICON(
+        FeatureValueType.BOOLEAN,
+        R.string._5g_plus_icon,
+        R.string._5g_plus_icon_desc,
+        true,
+    ),
     SHOW_4G_FOR_LTE(
         FeatureValueType.BOOLEAN,
         R.string.show_4g_for_lte,

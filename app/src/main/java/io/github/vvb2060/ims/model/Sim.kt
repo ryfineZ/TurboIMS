@@ -15,5 +15,8 @@ data class SimSelection(
         append(": ")
         append(displayName)
         append(" (${carrierName})")
-    }
+    },
+    val countryIso: String = "",
+    val mcc: String = "",
+    val mnc: String = "",
 )

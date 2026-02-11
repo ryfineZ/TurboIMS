@@ -1,39 +1,46 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version='1.0' encoding='utf-8'?>
 <resources>
+    <string name="system_info">Sistem Bilgisi</string>
+    <string name="app_version">Uygulama Sürümü: %s</string>
+    <string name="device_model">Cihaz Modeli: %s</string>
+    <string name="android_version">Android Sürümü: %s</string>
+    <string name="security_patch_version">Yama Tarihi: %s</string>
+    <string name="shizuku_status">Shizuku Durumu: %s</string>
+    <string name="shizuku_ready">✅ Hazır</string>
+    <string name="shizuku_not_running">❌ Çalışmıyor</string>
+    <string name="shizuku_no_permission">⚠️ İzin Yok</string>
+    <string name="shizuku_checking">Kontrol ediliyor…</string>
+    <string name="refresh_permission">Yenile</string>
+    <string name="request_permission">İste</string>
+    <string name="sim_card">SIM Kart</string>
+    <string name="all_sim">Tüm SIM</string>
+    <string name="refresh_short">Yenile</string>
+    <string name="action_sync_short">Senkronize</string>
+    <string name="action_default_short">Varsayılan</string>
+    <string name="ims_registration_status">IMS Kaydı</string>
+    <string name="ims_registration_status_desc">IMS kayıt durumunu gösterir. Elle kayıt için açın.</string>
+    <string name="carrier_name">Operatör Adı</string>
+    <string name="carrier_name_desc">Sistemde görünen operatör adını değiştirir</string>
+    <string name="country_iso">Ülke Kodu ISO</string>
+    <string name="country_iso_desc">Operatör ülke veya bölge kimliğini ISO kodu ile ayarlar</string>
+    <string name="ims_user_agent">IMS User Agent</string>
+    <string name="ims_user_agent_desc">Uyumluluk için IMS kimliğini ayarlar</string>
+    <string name="issue_info_copied">Sistem bilgisi panoya kopyalandı</string>
+    <string name="action_repo">Depo</string>
+    <string name="action_issue">Issue</string>
+    <string name="action_logcat">Kayıtlar</string>
+    <string name="apply_config">Uygula</string>
+    <string name="reset_config">Sıfırla</string>
+    <string name="dump_config">Dışa Aktar</string>
+    <string name="shizuku_not_running_msg">Shizuku çalışmıyor, önce Shizuku başlatın</string>
+    <string name="shizuku_no_permission_msg">Lütfen Shizuku izni verin</string>
+    <string name="select_single_sim">Lütfen tek bir SIM seçin</string>
+    <string name="sim_list_refresh">SIM listesi yenilendi</string>
     <string name="app_name">Turbo IMS</string>
     <string name="for_pixel">forked by Mystery0</string>
-
-    <!-- Main Screen -->
-    <string name="system_info">System Info</string>
-    <string name="app_version">App Version: %s</string>
-    <string name="device_model">Device Model: %s</string>
-    <string name="android_version">Android Version: %s</string>
     <string name="system_build_version">System Build Version: %s</string>
-    <string name="security_patch_version">Patch Date: %s</string>
-    <string name="shizuku_status">Shizuku Status: %s</string>
-    <string name="shizuku_ready">✅ Ready</string>
-    <string name="shizuku_not_running">❌ Not Running</string>
-    <string name="shizuku_no_permission">⚠️ No Permission</string>
-    <string name="shizuku_checking">Checking…</string>
-    <string name="refresh_permission">Refresh</string>
-    <string name="request_permission">Request</string>
-
-    <!-- SIM Card -->
-    <string name="sim_card">SIM Card</string>
-    <string name="all_sim">All SIM</string>
-
-    <!-- Features -->
     <string name="features_config">Features for this apply</string>
     <string name="tools">Tools</string>
-    <string name="refresh_short">Refresh</string>
-    <string name="action_sync_short">Sync</string>
-    <string name="action_default_short">Default</string>
-    <string name="ims_registration_status">IMS Registration</string>
-    <string name="ims_registration_status_desc">If IMS is unregistered, all features below are unavailable.</string>
-    <string name="carrier_name">Carrier Name</string>
-    <string name="carrier_name_desc">Used to change the carrier label shown by the system (for example, status bar carrier text)</string>
-    <string name="country_iso">Country ISO</string>
-    <string name="country_iso_desc">Used to set the carrier country/region identity (ISO code)</string>
     <string name="country_iso_option_default">System default (no override)</string>
     <string name="country_iso_option_china_mainland">China Mainland</string>
     <string name="country_iso_option_hong_kong">Hong Kong, China</string>
@@ -50,12 +57,6 @@
     <string name="country_iso_current_value">Current setting: %s</string>
     <string name="country_iso_custom_label">Custom country ISO (2 letters)</string>
     <string name="country_iso_custom_placeholder">Enter two-letter code, e.g. fr</string>
-    <string name="ims_user_agent">IMS User Agent</string>
-    <string name="ims_user_agent_desc">Sets the IMS registration identity string for compatibility</string>
-    <string name="issue_info_copied">System info copied to clipboard</string>
-    <string name="action_repo">Repo</string>
-    <string name="action_issue">Issue</string>
-    <string name="action_logcat">Logs</string>
     <string name="action_update">Update</string>
     <string name="volte">VoLTE (4G Voice)</string>
     <string name="volte_desc">Enable 4G HD voice calls</string>
@@ -77,14 +78,7 @@
     <string name="_5g_plus_icon_desc">Adapt to China mainland 5GA signal</string>
     <string name="show_4g_for_lte">Show 4G for LTE</string>
     <string name="show_4g_for_lte_desc">Show 4G icon for LTE data</string>
-
-    <!-- Button -->
-    <string name="apply_config">Apply</string>
-    <string name="reset_config">Reset</string>
     <string name="restart_ims">Restart IMS</string>
-    <string name="dump_config">Dump Config</string>
-
-    <!-- Tips -->
     <string name="tip">Tips:</string>
     <string-array name="tips">
         <item>!• When Shizuku is not ready, only System Info is shown; once ready, the SIM list auto-refreshes and the primary SIM is selected by default.</item>
@@ -93,10 +87,6 @@
         <item>• After a successful reset, current system state is synced automatically.</item>
         <item>• If you have signal but no data, check whether APN is empty after system updates.</item>
     </string-array>
-
-    <!-- Messages -->
-    <string name="shizuku_not_running_msg">Shizuku is not running, please start Shizuku first</string>
-    <string name="shizuku_no_permission_msg">Please grant Shizuku permission</string>
     <string name="phone_no_permission_msg">Please grant permission to read SIM card</string>
     <string name="config_success_message">Configuration applied!</string>
     <string name="config_success_reset_message">Configuration reset!</string>
@@ -108,9 +98,7 @@
     <string name="ims_restart_failed">IMS restart failed: %s</string>
     <string name="ims_register_success">IMS registered</string>
     <string name="ims_register_pending">Registration triggered, please sync status again shortly</string>
-    <string name="select_single_sim">Please select a single SIM</string>
     <string name="update_shizuku">Please update Shizuku to the latest version</string>
-    <string name="sim_list_refresh">SIM list refreshed</string>
     <string name="update_checking">Checking for updates…</string>
     <string name="update_latest">You already have the latest version</string>
     <string name="update_no_apk">No downloadable APK found</string>
@@ -124,21 +112,15 @@
     <string name="update_download_error_reason">Download failed: %s</string>
     <string name="update_install_permission_required">Please allow installing unknown apps first</string>
     <string name="update_open_settings">Open Settings</string>
-
-    <!-- Dump -->
     <string name="dump_title">CarrierConfig Dump</string>
     <string name="dump_copy">Copy</string>
     <string name="dump_copy_success">Copied to clipboard</string>
     <string name="dump_loading">Loading…</string>
     <string name="dump_error">Dump failed: %s</string>
     <string name="dump_filter_label">Filter (key/value)</string>
-
-    <!-- QS Tiles -->
     <string name="qs_toggle_tile_title_sim_1">VoLTE Toggle (SIM 1)</string>
     <string name="qs_toggle_tile_title_sim_2">VoLTE Toggle (SIM 2)</string>
     <string name="qs_status_tile_title_sim_1">IMS Status (SIM 1)</string>
     <string name="qs_status_tile_title_sim_2">IMS Status (SIM 2)</string>
-
-    <!-- Logcat -->
     <string name="title_filter_log_level">Select filter log level</string>
 </resources>

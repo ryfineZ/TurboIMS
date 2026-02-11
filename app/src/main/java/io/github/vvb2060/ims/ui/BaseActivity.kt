@@ -13,11 +13,11 @@ abstract class BaseActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             TurbolImsTheme {
-                content()
+                Content()
             }
         }
     }
 
     @Composable
-    abstract fun content()
+    abstract fun Content()
 }

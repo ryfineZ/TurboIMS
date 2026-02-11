@@ -46,7 +46,7 @@ class DumpActivity : BaseActivity() {
     private val viewModel: DumpViewModel by viewModels()
 
     @Composable
-    override fun content() {
+    override fun Content() {
         val context = LocalContext.current
         val clipboardManager = LocalClipboardManager.current
         val state by viewModel.uiState.collectAsStateWithLifecycle()

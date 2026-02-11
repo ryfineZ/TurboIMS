@@ -1,6 +1,8 @@
 # Turbo IMS
 
 > TurboIMS 的改版分支，增加诊断与兼容能力，适配 Android 16 之后的限制。
+>
+> 本项目 fork 自 [Turbo1123/TurboIMS](https://github.com/Turbo1123/TurboIMS)，并在此基础上持续维护与增强。
 
 ## 为什么要改
 

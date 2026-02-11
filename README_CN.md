@@ -26,6 +26,7 @@
 ## 关于
 
 TurboIMS 是一个允许您在 Google Pixel 手机上启用或禁用 VoLTE（高清语音通话）、VoWiFi（Wi-Fi 通话）、VT（视频通话）和 VoNR（5G 语音）等 IMS 功能的工具。它需要 [Shizuku](https://shizuku.rikka.app/zh-CN/) 才能工作。
+本项目 fork 自 [Turbo1123/TurboIMS](https://github.com/Turbo1123/TurboIMS)，并在此基础上持续维护与增强。
 
 ## 功能
 

@@ -9,7 +9,7 @@
     <string name="device_model">设备型号: %s</string>
     <string name="android_version">Android 版本：%s</string>
     <string name="system_build_version">系统版本号：%s</string>
-    <string name="security_patch_version">系统安全补丁版本：%s</string>
+    <string name="security_patch_version">补丁版本日期：%s</string>
     <string name="shizuku_status">Shizuku 状态：%s</string>
     <string name="shizuku_ready">✅ 已就绪</string>
     <string name="shizuku_not_running">❌ 未运行</string>
@@ -19,18 +19,44 @@
     <string name="request_permission">请求</string>
 
     <!-- SIM Card -->
-    <string name="sim_card">本次应用的 SIM 卡</string>
-    <string name="all_sim">所有Sim</string>
+    <string name="sim_card">SIM卡</string>
+    <string name="all_sim">所有SIM</string>
 
     <!-- Features -->
     <string name="features_config">本次应用功能列表</string>
     <string name="tools">工具</string>
+    <string name="refresh_short">刷新</string>
+    <string name="action_sync_short">同步</string>
+    <string name="action_default_short">默认</string>
+    <string name="ims_registration_status">IMS 注册状态</string>
+    <string name="ims_registration_status_desc">IMS 未注册时，下方功能均无效</string>
     <string name="carrier_name">运营商名称</string>
-    <string name="carrier_name_desc">自定义运营商显示的名称，为空则不修改</string>
+    <string name="carrier_name_desc">用于修改系统显示的运营商名称标识（如状态栏运营商名）</string>
     <string name="country_iso">运营商国家码</string>
-    <string name="country_iso_desc">自定义运营商国家码，为空则不修改</string>
+    <string name="country_iso_desc">用于指定运营商国家/地区归属（ISO 国家码）</string>
+    <string name="country_iso_option_default">系统默认（不覆盖）</string>
+    <string name="country_iso_option_china_mainland">中国大陆</string>
+    <string name="country_iso_option_hong_kong">中国香港</string>
+    <string name="country_iso_option_taiwan">中国台湾</string>
+    <string name="country_iso_option_us">美国</string>
+    <string name="country_iso_option_japan">日本</string>
+    <string name="country_iso_option_uk">英国</string>
+    <string name="country_iso_option_korea">韩国</string>
+    <string name="country_iso_option_singapore">新加坡</string>
+    <string name="country_iso_option_other">其他</string>
+    <string name="country_iso_option_format_mcc_iso">%1$s MCC: %2$s (ISO: %3$s)</string>
+    <string name="country_iso_option_format_iso">%1$s (ISO: %2$s)</string>
+    <string name="country_iso_unknown">未知</string>
+    <string name="country_iso_current_value">当前设置：%s</string>
+    <string name="country_iso_custom_label">手动输入 ISO（2位字母）</string>
+    <string name="country_iso_custom_placeholder">请输入两位国家码，例如 fr</string>
     <string name="ims_user_agent">IMS User Agent</string>
-    <string name="ims_user_agent_desc">自定义 IMS User Agent 字符串，为空则不修改</string>
+    <string name="ims_user_agent_desc">用于设置 IMS 注册上报标识，影响兼容性</string>
+    <string name="issue_info_copied">系统信息已复制到剪贴板</string>
+    <string name="action_repo">仓库</string>
+    <string name="action_issue">Issue</string>
+    <string name="action_logcat">日志</string>
+    <string name="action_update">更新</string>
     <string name="volte">VoLTE（4G 语音）</string>
     <string name="volte_desc">启用 4G 高清语音通话</string>
     <string name="vowifi">VoWiFi（WiFi 通话）</string>
@@ -45,24 +71,26 @@
     <string name="ut_desc">呼叫转移、呼叫等待等</string>
     <string name="_5g_nr">5G NR（NSA/SA）</string>
     <string name="_5g_nr_desc">启用 5G 网络（非独立/独立组网）</string>
-    <string name="_5g_thresholds">5G信号强度阈值调整</string>
-    <string name="_5g_thresholds_desc">将 5G 信号强度阈值调整为与 LTE 阈值相同</string>
+    <string name="_5g_thresholds">5G信号强度调整</string>
+    <string name="_5g_thresholds_desc">5G信号强度调整为匹配中国大陆阈值</string>
+    <string name="_5g_plus_icon">5GA/5G+ 图标显示</string>
+    <string name="_5g_plus_icon_desc">适配中国大陆5GA信号</string>
     <string name="show_4g_for_lte">显示 4G 图标</string>
     <string name="show_4g_for_lte_desc">LTE 网络显示为 4G 图标</string>
 
     <!-- Button -->
-    <string name="apply_config">应用配置</string>
-    <string name="reset_config">重置配置</string>
+    <string name="apply_config">应用</string>
+    <string name="reset_config">重置</string>
     <string name="restart_ims">重启 IMS</string>
-    <string name="dump_config">导出配置</string>
+    <string name="dump_config">导出</string>
 
     <!-- Tips -->
     <string name="tip">提示：</string>
     <string-array name="tips">
-        <item>!• Shizuku 就绪时会读取系统当前配置；否则回退到历史/默认配置</item>
-        <item>• 需要先启动并授权 Shizuku</item>
-        <item>• 配置生效到选择的 SIM 卡上</item>
-        <item>• 重置配置会回到一开始的状态，但是功能开关不会有变化</item>
+        <item>!• Shizuku 未就绪时仅显示系统信息；就绪后会自动刷新 SIM 列表并默认选中主 SIM</item>
+        <item>• 进入可操作界面后会自动读取当前系统配置并同步到开关和输入项</item>
+        <item>• 配置会生效到当前选中的 SIM 卡；选择“所有SIM”会批量应用</item>
+        <item>• 重置配置成功后会自动同步当前系统状态</item>
         <item>• 更新系统后如有信号但无流量，请先检查 APN 是否为空</item>
     </string-array>
 
@@ -78,9 +106,24 @@
     <string name="load_config_current_success">已加载系统当前配置</string>
     <string name="ims_restart_success">IMS 已重启</string>
     <string name="ims_restart_failed">IMS 重启失败：%s</string>
+    <string name="ims_register_success">IMS 注册成功</string>
+    <string name="ims_register_pending">已触发注册，请稍后重试同步状态</string>
     <string name="select_single_sim">请选中单张 SIM 卡</string>
     <string name="update_shizuku">请更新 Shizuku 到最新版本</string>
     <string name="sim_list_refresh">SIM卡列表已刷新</string>
+    <string name="update_checking">检查更新中…</string>
+    <string name="update_latest">当前已是最新版本</string>
+    <string name="update_no_apk">未找到可下载的安装包</string>
+    <string name="update_check_failed">检查更新失败：%s</string>
+    <string name="update_found_title">发现新版本：%s</string>
+    <string name="update_found_message">当前版本：%1$s\n最新版本：%2$s\n是否下载并安装？</string>
+    <string name="update_download_install">下载并安装</string>
+    <string name="update_download_started">开始下载更新</string>
+    <string name="update_download_failed">下载更新失败</string>
+    <string name="update_download_complete">下载完成，正在打开安装器</string>
+    <string name="update_download_error_reason">下载失败：%s</string>
+    <string name="update_install_permission_required">请先允许“安装未知应用”</string>
+    <string name="update_open_settings">去设置</string>
 
     <!-- Dump -->
     <string name="dump_title">CarrierConfig 导出</string>

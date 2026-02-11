@@ -19,6 +19,18 @@ import rikka.shizuku.ShizukuBinderWrapper
 class ImsModifier : Instrumentation() {
     companion object Companion {
         private const val TAG = "ImsModifier"
+        private const val KEY_NR_ADVANCED_THRESHOLD_BANDWIDTH_KHZ = "nr_advanced_threshold_bandwidth_khz_int"
+        private const val KEY_ADDITIONAL_NR_ADVANCED_BANDS = "additional_nr_advanced_bands_int_array"
+        private const val KEY_5G_ICON_CONFIGURATION = "5g_icon_configuration_string"
+        private const val KEY_NR_ADVANCED_CAPABLE_PCO_ID = "nr_advanced_capable_pco_id_int"
+        private const val KEY_INCLUDE_LTE_FOR_NR_ADVANCED_THRESHOLD_BANDWIDTH =
+            "include_lte_for_nr_advanced_threshold_bandwidth_bool"
+        private const val NR_ADVANCED_THRESHOLD_KHZ_FOR_5GA = 110_000
+        private const val NR_ICON_CONFIGURATION_5GA =
+            "connected_mmwave:5G_Plus,connected:5G,connected_rrc_idle:5G,not_restricted_rrc_idle:5G,not_restricted_rrc_con:5G"
+        private val NR_ADVANCED_BANDS_FOR_CHINA = intArrayOf(
+            1, 3, 8, 28, 41, 78, 79
+        )
         const val BUNDLE_SELECT_SIM_ID = "select_sim_id"
         const val BUNDLE_RESET = "reset"
         const val BUNDLE_RESULT = "result"
@@ -40,6 +52,7 @@ class ImsModifier : Instrumentation() {
             enableUT: Boolean,
             enable5GNR: Boolean,
             enable5GThreshold: Boolean,
+            enable5GPlusIcon: Boolean,
             enableShow4GForLTE: Boolean,
         ): Bundle {
             val bundle = Bundle()
@@ -133,6 +146,21 @@ class ImsModifier : Instrumentation() {
                         CarrierConfigManager.CARRIER_NR_AVAILABILITY_SA
                     )
                 )
+                if (enable5GPlusIcon) {
+                    // 5GA / 5G+ 图标判定逻辑：
+                    // 1) 只有达到较高 NR 聚合带宽（这里使用 110MHz）才进入 NR Advanced；
+                    // 2) 将 NR Advanced 对应状态映射到 5G_Plus 图标；
+                    // 3) 补充常见国内 NR 频段，避免 Sub-6 场景因非毫米波而无法进入高级图标状态。
+                    bundle.putInt(KEY_NR_ADVANCED_THRESHOLD_BANDWIDTH_KHZ, NR_ADVANCED_THRESHOLD_KHZ_FOR_5GA)
+                    bundle.putBoolean(
+                        KEY_INCLUDE_LTE_FOR_NR_ADVANCED_THRESHOLD_BANDWIDTH,
+                        false
+                    )
+                    bundle.putIntArray(KEY_ADDITIONAL_NR_ADVANCED_BANDS, NR_ADVANCED_BANDS_FOR_CHINA)
+                    bundle.putString(KEY_5G_ICON_CONFIGURATION, NR_ICON_CONFIGURATION_5GA)
+                    // 将 PCO 约束置零，避免被运营商 PCO gate 阻断 NR Advanced 图标显示。
+                    bundle.putInt(KEY_NR_ADVANCED_CAPABLE_PCO_ID, 0)
+                }
                 if (enable5GThreshold) {
                     bundle.putIntArray(
                         CarrierConfigManager.KEY_5G_NR_SSRSRP_THRESHOLDS_INT_ARRAY,  // Boundaries: [-140 dBm, -44 dBm]
@@ -213,8 +241,9 @@ class ImsModifier : Instrumentation() {
             }
             val reset = arguments.getBoolean(BUNDLE_RESET, false)
             arguments.remove(BUNDLE_RESET)
-            val values = if (reset) null else arguments.toPersistableBundle()
+            val baseValues = if (reset) null else arguments.toPersistableBundle()
             for (subId in subIds) {
+                val values = baseValues?.let { PersistableBundle(it) }
                 Log.i(TAG, "overrideConfig for subId $subId with values $values")
                 // 使用反射调用 overrideConfig
                 try {

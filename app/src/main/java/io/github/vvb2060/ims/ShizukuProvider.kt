@@ -17,6 +17,7 @@ import io.github.vvb2060.ims.privileged.ImsStatusReader
 import io.github.vvb2060.ims.privileged.ImsModifier
 import io.github.vvb2060.ims.privileged.SimReader
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeoutOrNull
 import org.lsposed.hiddenapibypass.LSPass
 import rikka.shizuku.ShizukuBinderWrapper
 import rikka.shizuku.ShizukuProvider
@@ -30,6 +31,7 @@ class ShizukuProvider : ShizukuProvider() {
 
     companion object {
         private const val TAG = "ShizukuProvider"
+        private const val INSTRUMENTATION_RESULT_TIMEOUT_MS = 15_000L
 
         suspend fun overrideImsConfig(context: Context, data: Bundle): String? {
             val primaryArgs = Bundle(data)
@@ -60,6 +62,9 @@ class ShizukuProvider : ShizukuProvider() {
                     it.displayName.toString(),
                     it.carrierName.toString(),
                     it.simSlotIndex,
+                    countryIso = it.countryIso ?: "",
+                    mcc = it.mccString ?: "",
+                    mnc = it.mncString ?: "",
                 )
             } ?: emptyList()
             return resultList
@@ -162,7 +167,9 @@ class ShizukuProvider : ShizukuProvider() {
                 am.startInstrumentation(name, null, flags, args, watcher, connection, 0, null)
                 Log.i(TAG, "instrumentation started successfully")
                 if (receiveResult) {
-                    return deferredResult.await()
+                    return withTimeoutOrNull(INSTRUMENTATION_RESULT_TIMEOUT_MS) {
+                        deferredResult.await()
+                    }
                 }
                 return null
             } catch (e: Exception) {

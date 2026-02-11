@@ -30,7 +30,7 @@ class LogcatActivity : BaseActivity() {
     private val viewModel: LogcatViewModel by viewModels()
 
     @Composable
-    override fun content() {
+    override fun Content() {
         val logs = viewModel.logs
         var filter by remember { mutableStateOf(LogLevel.DEBUG) }
         var expanded by rememberSaveable { mutableStateOf(true) }

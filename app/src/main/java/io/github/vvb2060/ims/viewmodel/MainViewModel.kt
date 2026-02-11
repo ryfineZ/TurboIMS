@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import android.telephony.SubscriptionManager
 import android.widget.Toast
 import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
@@ -68,8 +69,10 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
      */
     fun updateShizukuStatus() {
         viewModelScope.launch {
+            val previousStatus = _shizukuStatus.value
             if (Shizuku.isPreV11()) {
                 _shizukuStatus.value = ShizukuStatus.NEED_UPDATE
+                return@launch
             }
             val status = when {
                 !Shizuku.pingBinder() -> ShizukuStatus.NOT_RUNNING
@@ -77,6 +80,9 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
                 else -> ShizukuStatus.READY
             }
             _shizukuStatus.value = status
+            if (status == ShizukuStatus.READY && previousStatus != ShizukuStatus.READY) {
+                loadSimList()
+            }
         }
     }
 
@@ -107,17 +113,33 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
 
     /**
      * 通过 Shizuku 读取设备上的 SIM 卡信息。
-     * 并在列表头部添加“所有 SIM 卡”选项。
+     * 主 SIM 优先显示，“所有 SIM 卡”放在列表末尾。
      */
     fun loadSimList() {
         viewModelScope.launch {
             val simInfoList = ShizukuProvider.readSimInfoList(application)
-            val resultList = simInfoList.toMutableList()
-            // 添加默认的 "所有 SIM 卡" 选项 (subId = -1)
+            val primarySubId = resolvePrimarySubId()
+            val sortedSimList = simInfoList.sortedWith(
+                compareByDescending<SimSelection> { it.subId == primarySubId }
+                    .thenBy { it.simSlotIndex }
+                    .thenBy { it.subId }
+            )
+            val resultList = sortedSimList.toMutableList()
+            // 添加默认的 "所有 SIM 卡" 选项 (subId = -1) 到末尾
             val title = application.getString(R.string.all_sim)
-            resultList.add(0, SimSelection(-1, "", "", -1, title))
+            resultList.add(SimSelection(-1, "", "", -1, title))
             _allSimList.value = resultList
         }
+    }
+
+    private fun resolvePrimarySubId(): Int {
+        val dataSubId = SubscriptionManager.getDefaultDataSubscriptionId()
+        if (dataSubId != SubscriptionManager.INVALID_SUBSCRIPTION_ID) return dataSubId
+        val voiceSubId = SubscriptionManager.getDefaultVoiceSubscriptionId()
+        if (voiceSubId != SubscriptionManager.INVALID_SUBSCRIPTION_ID) return voiceSubId
+        val smsSubId = SubscriptionManager.getDefaultSmsSubscriptionId()
+        if (smsSubId != SubscriptionManager.INVALID_SUBSCRIPTION_ID) return smsSubId
+        return SubscriptionManager.INVALID_SUBSCRIPTION_ID
     }
 
     /**
@@ -127,7 +149,7 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
         viewModelScope.launch {
             _systemInfo.value = SystemInfo(
                 appVersionName = BuildConfig.VERSION_NAME,
-                androidVersion = "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
+                androidVersion = "Android ${Build.VERSION.RELEASE} / ${Build.DISPLAY}",
                 deviceModel = "${Build.MANUFACTURER} ${Build.MODEL}",
                 systemVersion = Build.DISPLAY,
                 securityPatchVersion = Build.VERSION.SECURITY_PATCH,
@@ -141,9 +163,6 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
      */
     fun onApplyConfiguration(selectedSim: SimSelection, map: Map<Feature, FeatureValue>) {
         viewModelScope.launch {
-            // 保存配置到 SharedPreferences
-            saveConfiguration(selectedSim.subId, map)
-
             // 构建传递给底层 ImsModifier 的配置 Bundle
             val carrierName =
                 if (selectedSim.subId == -1) null else map[Feature.CARRIER_NAME]?.data as String?
@@ -159,6 +178,7 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
             val enableUT = (map[Feature.UT]?.data ?: true) as Boolean
             val enable5GNR = (map[Feature.FIVE_G_NR]?.data ?: true) as Boolean
             val enable5GThreshold = (map[Feature.FIVE_G_THRESHOLDS]?.data ?: true) as Boolean
+            val enable5GPlusIcon = (map[Feature.FIVE_G_PLUS_ICON]?.data ?: true) as Boolean
             val enableShow4GForLTE = (map[Feature.SHOW_4G_FOR_LTE]?.data ?: false) as Boolean
 
             val bundle = ImsModifier.buildBundle(
@@ -173,6 +193,7 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
                 enableUT,
                 enable5GNR,
                 enable5GThreshold,
+                enable5GPlusIcon,
                 enableShow4GForLTE
             )
             bundle.putInt(ImsModifier.BUNDLE_SELECT_SIM_ID, selectedSim.subId)
@@ -180,6 +201,8 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
             // 调用 Shizuku 服务进行实际修改
             val resultMsg = ShizukuProvider.overrideImsConfig(application, bundle)
             if (resultMsg == null) {
+                // 仅在应用成功后保存配置，避免本地状态与系统状态不一致
+                saveConfiguration(selectedSim.subId, map)
                 toast(application.getString(R.string.config_success_message))
             } else {
                 toast(application.getString(R.string.config_failed, resultMsg), false)
@@ -241,31 +264,40 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
         return FeatureConfigMapper.fromBundle(bundle)
     }
 
+    suspend fun readImsRegistrationStatus(subId: Int): Boolean? {
+        if (subId < 0) return null
+        return ShizukuProvider.readImsRegistrationStatus(application, subId)
+    }
+
+    suspend fun registerIms(subId: Int): Boolean? {
+        if (subId < 0) return null
+        val resultMsg = ShizukuProvider.restartImsRegistration(application, subId)
+        if (resultMsg != null) {
+            toast(application.getString(R.string.ims_restart_failed, resultMsg), false)
+            return null
+        }
+        val status = readImsRegistrationStatus(subId)
+        if (status == true) {
+            toast(application.getString(R.string.ims_register_success))
+        } else {
+            toast(application.getString(R.string.ims_register_pending), false)
+        }
+        return status
+    }
+
     /**
      * 重置选中 SIM 卡的配置到运营商默认状态。
      */
-    fun onResetConfiguration(selectedSim: SimSelection) {
-        viewModelScope.launch {
-            val bundle = ImsModifier.buildResetBundle()
-            bundle.putInt(ImsModifier.BUNDLE_SELECT_SIM_ID, selectedSim.subId)
-            val resultMsg = ShizukuProvider.overrideImsConfig(application, bundle)
-            if (resultMsg == null) {
-                toast(application.getString(R.string.config_success_reset_message))
-            } else {
-                toast(application.getString(R.string.config_failed, resultMsg), false)
-            }
+    suspend fun onResetConfiguration(selectedSim: SimSelection): Boolean {
+        val bundle = ImsModifier.buildResetBundle()
+        bundle.putInt(ImsModifier.BUNDLE_SELECT_SIM_ID, selectedSim.subId)
+        val resultMsg = ShizukuProvider.overrideImsConfig(application, bundle)
+        if (resultMsg == null) {
+            toast(application.getString(R.string.config_success_reset_message))
+            return true
         }
-    }
-
-    fun restartImsRegistration(selectedSim: SimSelection) {
-        viewModelScope.launch {
-            val resultMsg = ShizukuProvider.restartImsRegistration(application, selectedSim.subId)
-            if (resultMsg == null) {
-                toast(application.getString(R.string.ims_restart_success))
-            } else {
-                toast(application.getString(R.string.ims_restart_failed, resultMsg), false)
-            }
-        }
+        toast(application.getString(R.string.config_failed, resultMsg), false)
+        return false
     }
 
     private fun toast(msg: String, short: Boolean = true) {
