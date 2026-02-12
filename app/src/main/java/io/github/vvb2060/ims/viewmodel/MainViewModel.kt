@@ -139,6 +139,11 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
         val shizukuReady =
             Shizuku.pingBinder() &&
                 Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+        if (!shizukuReady) {
+            val title = application.getString(R.string.all_sim)
+            _allSimList.value = listOf(SimSelection(-1, "", "", -1, title))
+            return false
+        }
         val retryCount = if (shizukuReady) 3 else 1
         var simInfoList: List<SimSelection> = emptyList()
         for (attempt in 0 until retryCount) {

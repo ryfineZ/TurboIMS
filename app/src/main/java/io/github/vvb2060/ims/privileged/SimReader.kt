@@ -30,9 +30,11 @@ class SimReader : Instrumentation() {
         super.start()
         val binder = ServiceManager.getService(Context.ACTIVITY_SERVICE)
         val am = IActivityManager.Stub.asInterface(ShizukuBinderWrapper(binder))
-        Log.i(TAG, "starting shell permission delegation")
-        am.startDelegateShellPermissionIdentity(Os.getuid(), null)
+        var delegated = false
         try {
+            Log.i(TAG, "starting shell permission delegation")
+            am.startDelegateShellPermissionIdentity(Os.getuid(), null)
+            delegated = true
             Log.d(TAG, "start read sim info list")
             val resultList = readByISub() ?: run {
                 val subManager =
@@ -44,12 +46,18 @@ class SimReader : Instrumentation() {
             val bundle = Bundle()
             bundle.putParcelableArrayList(BUNDLE_RESULT, ArrayList(resultList))
             finish(Activity.RESULT_OK, bundle)
-        } catch (e: Exception) {
-            Log.e(TAG, "failed to read sim info list", e)
+        } catch (t: Throwable) {
+            Log.e(TAG, "failed to read sim info list", t)
             finish(Activity.RESULT_CANCELED, Bundle())
         } finally {
-            am.stopDelegateShellPermissionIdentity()
-            Log.i(TAG, "stopped shell permission delegation")
+            if (delegated) {
+                runCatching {
+                    am.stopDelegateShellPermissionIdentity()
+                    Log.i(TAG, "stopped shell permission delegation")
+                }.onFailure {
+                    Log.w(TAG, "failed to stop shell permission delegation", it)
+                }
+            }
         }
     }
 
