@@ -30,6 +30,8 @@
     <string name="action_default_short">默认</string>
     <string name="ims_registration_status">IMS 注册状态</string>
     <string name="ims_registration_status_desc">IMS 未注册时，下方功能均无效</string>
+    <string name="ims_registration_per_sim_desc">选择“所有SIM”时，IMS 注册按每张 SIM 独立执行，结果可能不同。</string>
+    <string name="all_sim_switch_only_desc">开关项切换后立即生效；文本项修改后请点击“应用”</string>
     <string name="carrier_name">运营商名称</string>
     <string name="carrier_name_desc">用于修改系统显示的运营商名称标识（如状态栏运营商名）</string>
     <string name="country_iso">运营商国家码</string>
@@ -53,6 +55,9 @@
     <string name="ims_user_agent">IMS User Agent</string>
     <string name="ims_user_agent_desc">用于设置 IMS 注册上报标识，影响兼容性</string>
     <string name="issue_info_copied">系统信息已复制到剪贴板</string>
+    <string name="issue_failure_hint_title">检测到失败日志</string>
+    <string name="issue_failure_hint_desc">建议提交 Issue，并附带系统信息与失败日志。</string>
+    <string name="issue_failure_submit">提交 Issue</string>
     <string name="action_repo">仓库</string>
     <string name="action_issue">Issue</string>
     <string name="action_logcat">日志</string>
@@ -82,6 +87,7 @@
     <string name="apply_config">应用</string>
     <string name="apply_config_running">应用中…</string>
     <string name="reset_config">重置</string>
+    <string name="reset_config_desc">重置会清除当前SIM的覆盖配置并恢复运营商默认配置</string>
     <string name="restart_ims">重启 IMS</string>
     <string name="dump_config">导出</string>
 
@@ -112,6 +118,8 @@
     <string name="load_config_current_success">已加载系统当前配置</string>
     <string name="ims_restart_success">IMS 已重启</string>
     <string name="ims_restart_failed">IMS 重启失败：%s</string>
+    <string name="ims_register_apply_then_register">正在应用配置并触发 IMS 注册…</string>
+    <string name="ims_register_apply_failed">配置应用失败，未触发 IMS 注册：%s</string>
     <string name="ims_register_success">IMS 注册成功</string>
     <string name="ims_register_pending">已触发注册，请稍后重试同步状态</string>
     <string name="select_single_sim">请选中单张 SIM 卡</string>

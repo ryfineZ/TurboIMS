@@ -30,6 +30,8 @@
     <string name="action_default_short">Default</string>
     <string name="ims_registration_status">IMS Registration</string>
     <string name="ims_registration_status_desc">If IMS is unregistered, all features below are unavailable.</string>
+    <string name="ims_registration_per_sim_desc">In All SIM mode, IMS registration is handled per SIM and results may differ.</string>
+    <string name="all_sim_switch_only_desc">Switches take effect immediately; tap \"Apply\" after editing text fields.</string>
     <string name="carrier_name">Carrier Name</string>
     <string name="carrier_name_desc">Used to change the carrier label shown by the system (for example, status bar carrier text)</string>
     <string name="country_iso">Country ISO</string>
@@ -53,6 +55,9 @@
     <string name="ims_user_agent">IMS User Agent</string>
     <string name="ims_user_agent_desc">Sets the IMS registration identity string for compatibility</string>
     <string name="issue_info_copied">System info copied to clipboard</string>
+    <string name="issue_failure_hint_title">Failure logs detected</string>
+    <string name="issue_failure_hint_desc">Submit an Issue with system info and failure logs.</string>
+    <string name="issue_failure_submit">Submit Issue</string>
     <string name="action_repo">Repo</string>
     <string name="action_issue">Issue</string>
     <string name="action_logcat">Logs</string>
@@ -82,6 +87,7 @@
     <string name="apply_config">Apply</string>
     <string name="apply_config_running">Applying…</string>
     <string name="reset_config">Reset</string>
+    <string name="reset_config_desc">Reset clears current SIM overrides and restores carrier defaults.</string>
     <string name="restart_ims">Restart IMS</string>
     <string name="dump_config">Dump Config</string>
 
@@ -112,6 +118,8 @@
     <string name="load_config_current_success">Loaded current system configuration</string>
     <string name="ims_restart_success">IMS restarted</string>
     <string name="ims_restart_failed">IMS restart failed: %s</string>
+    <string name="ims_register_apply_then_register">Applying config, then triggering IMS registration…</string>
+    <string name="ims_register_apply_failed">Apply failed, IMS registration not triggered: %s</string>
     <string name="ims_register_success">IMS registered</string>
     <string name="ims_register_pending">Registration triggered, please sync status again shortly</string>
     <string name="select_single_sim">Please select a single SIM</string>

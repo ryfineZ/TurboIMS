@@ -5,6 +5,7 @@ import android.app.IInstrumentationWatcher
 import android.app.UiAutomationConnection
 import android.content.ComponentName
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.os.Bundle
 import android.os.ServiceManager
 import android.telephony.SubscriptionInfo
@@ -123,9 +124,14 @@ class ShizukuProvider : ShizukuProvider() {
             key: String,
             value: Boolean,
         ): String? {
+            val appInfo = context.applicationInfo
+            val canUsePersistentOverride =
+                (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0 ||
+                    (appInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
             val bundle = Bundle().apply {
                 putInt(ImsModifier.BUNDLE_SELECT_SIM_ID, subId)
                 putBoolean(key, value)
+                putBoolean(ImsModifier.BUNDLE_PREFER_PERSISTENT, canUsePersistentOverride)
             }
             return overrideImsConfig(context, bundle)
         }

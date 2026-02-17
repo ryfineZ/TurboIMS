@@ -2,9 +2,12 @@ package io.github.vvb2060.ims.viewmodel
 
 import android.app.Application
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Build
+import android.provider.Settings
 import android.telephony.SubscriptionManager
+import android.util.Log
 import android.widget.Toast
 import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
@@ -20,11 +23,20 @@ import io.github.vvb2060.ims.model.ShizukuStatus
 import io.github.vvb2060.ims.model.SimSelection
 import io.github.vvb2060.ims.model.SystemInfo
 import io.github.vvb2060.ims.privileged.ImsModifier
+import java.io.File
+import java.security.MessageDigest
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import rikka.shizuku.Shizuku
 
 /**
@@ -32,7 +44,35 @@ import rikka.shizuku.Shizuku
  * 包括 Shizuku 状态监听、系统信息加载、SIM 卡信息加载以及 IMS 配置的读写。
  */
 class MainViewModel(private val application: Application) : AndroidViewModel(application) {
+    companion object {
+        private const val TAG = "MainViewModel"
+        private const val RUNTIME_PREFS = "runtime_state"
+        private const val KEY_LAST_BOOT_COUNT = "last_boot_count"
+        private const val ISSUE_FAILURE_LOG_FILE = "issue_failure_logs.txt"
+        private const val ISSUE_FAILURE_LOG_MAX_LINES = 200
+    }
+
+    private data class BootRestoreResult(
+        val attempted: Int,
+        val success: Int,
+        val failed: Int,
+    )
+
+    data class ImsRegisterResult(
+        val registered: Boolean?,
+        val backendErrorMessage: String?,
+    )
+
     private var toast: Toast? = null
+    private val runtimePrefs = application.getSharedPreferences(RUNTIME_PREFS, Context.MODE_PRIVATE)
+    private val issueFailureLogMutex = Mutex()
+    private var pendingConfigRestoreAfterBoot = false
+    private var restoringConfigAfterBoot = false
+    private val canUsePersistentOverride by lazy {
+        val flags = application.applicationInfo.flags
+        (flags and ApplicationInfo.FLAG_SYSTEM) != 0 ||
+            (flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+    }
 
     // 系统信息状态流
     private val _systemInfo = MutableStateFlow(SystemInfo())
@@ -46,13 +86,19 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
     private val _allSimList = MutableStateFlow<List<SimSelection>>(emptyList())
     val allSimList: StateFlow<List<SimSelection>> = _allSimList.asStateFlow()
 
+    // 失败日志（用于 issue 提交）
+    private val _issueFailureLogs = MutableStateFlow("")
+    val issueFailureLogs: StateFlow<String> = _issueFailureLogs.asStateFlow()
+
     // Shizuku Binder 接收监听器（服务连接/授权后触发）
     private val binderListener = Shizuku.OnBinderReceivedListener { updateShizukuStatus() }
     private val binderDeadListener = Shizuku.OnBinderDeadListener { updateShizukuStatus() }
 
     init {
+        pendingConfigRestoreAfterBoot = checkAndMarkBootChanged()
         loadSimList()
         loadSystemInfo()
+        refreshIssueFailureLogs()
         updateShizukuStatus()
         Shizuku.addBinderReceivedListener(binderListener)
         Shizuku.addBinderDeadListener(binderDeadListener)
@@ -89,7 +135,10 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
                         _allSimList.value.all { it.subId == -1 }
                     )
             ) {
-                loadSimList()
+                loadSimListInternal()
+            }
+            if (status == ShizukuStatus.READY) {
+                maybeRestoreSavedConfigurationAfterBoot()
             }
         }
     }
@@ -234,6 +283,7 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
             enableShow4GForLTE
         )
         bundle.putInt(ImsModifier.BUNDLE_SELECT_SIM_ID, selectedSim.subId)
+        bundle.putBoolean(ImsModifier.BUNDLE_PREFER_PERSISTENT, canUsePersistentOverride)
 
         // 调用 Shizuku 服务进行实际修改
         val resultMsg = ShizukuProvider.overrideImsConfig(application, bundle)
@@ -303,12 +353,12 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
         return ShizukuProvider.readImsRegistrationStatus(application, subId)
     }
 
-    suspend fun registerIms(subId: Int): Boolean? {
-        if (subId < 0) return null
+    suspend fun registerIms(subId: Int): ImsRegisterResult {
+        if (subId < 0) return ImsRegisterResult(null, "invalid subId")
         val resultMsg = ShizukuProvider.restartImsRegistration(application, subId)
         if (resultMsg != null) {
             toast(application.getString(R.string.ims_restart_failed, resultMsg), false)
-            return null
+            return ImsRegisterResult(null, resultMsg)
         }
         val status = readImsRegistrationStatus(subId)
         if (status == true) {
@@ -316,7 +366,7 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
         } else {
             toast(application.getString(R.string.ims_register_pending), false)
         }
-        return status
+        return ImsRegisterResult(status, null)
     }
 
     /**
@@ -325,6 +375,7 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
     suspend fun onResetConfiguration(selectedSim: SimSelection): Boolean {
         val bundle = ImsModifier.buildResetBundle()
         bundle.putInt(ImsModifier.BUNDLE_SELECT_SIM_ID, selectedSim.subId)
+        bundle.putBoolean(ImsModifier.BUNDLE_PREFER_PERSISTENT, canUsePersistentOverride)
         val resultMsg = ShizukuProvider.overrideImsConfig(application, bundle)
         if (resultMsg == null) {
             toast(application.getString(R.string.config_success_reset_message))
@@ -339,5 +390,151 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
         toast =
             Toast.makeText(application, msg, if (short) Toast.LENGTH_SHORT else Toast.LENGTH_LONG)
         toast?.show()
+    }
+
+    private fun checkAndMarkBootChanged(): Boolean {
+        val currentBootCount = try {
+            Settings.Global.getInt(
+                application.contentResolver,
+                Settings.Global.BOOT_COUNT,
+                -1
+            )
+        } catch (t: Throwable) {
+            Log.w(TAG, "failed to read boot count", t)
+            -1
+        }
+        if (currentBootCount < 0) return false
+        val lastBootCount = runtimePrefs.getInt(KEY_LAST_BOOT_COUNT, -1)
+        runtimePrefs.edit { putInt(KEY_LAST_BOOT_COUNT, currentBootCount) }
+        return lastBootCount != -1 && lastBootCount != currentBootCount
+    }
+
+    suspend fun appendSwitchFailureLog(
+        action: String,
+        subId: Int?,
+        stage: String,
+        backendMessage: String,
+    ) {
+        val normalizedMessage = backendMessage.trim()
+        if (normalizedMessage.isBlank()) return
+        withContext(Dispatchers.IO) {
+            issueFailureLogMutex.withLock {
+                val file = issueFailureLogFile()
+                val currentLines = readIssueFailureLogRawLines(file)
+                val fingerprint = buildFailureLogFingerprint(
+                    action = action,
+                    subId = subId,
+                    stage = stage,
+                    backendMessage = normalizedMessage
+                )
+                if (currentLines.any { it.substringBefore("|") == fingerprint }) {
+                    _issueFailureLogs.value = extractIssueLogText(currentLines)
+                    return@withLock
+                }
+                val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+                    .format(Date())
+                val messageForStore = normalizedMessage.replace(Regex("\\s+"), " ")
+                val line = buildString {
+                    append(fingerprint)
+                    append("|")
+                    append(timestamp)
+                    append(" | action=")
+                    append(action)
+                    append(" | subId=")
+                    append(subId ?: "-")
+                    append(" | stage=")
+                    append(stage)
+                    append(" | msg=")
+                    append(messageForStore)
+                }
+                val updated = (currentLines + line).takeLast(ISSUE_FAILURE_LOG_MAX_LINES)
+                file.parentFile?.mkdirs()
+                file.writeText(updated.joinToString("\n"))
+                _issueFailureLogs.value = extractIssueLogText(updated)
+            }
+        }
+    }
+
+    private fun refreshIssueFailureLogs() {
+        viewModelScope.launch(Dispatchers.IO) {
+            issueFailureLogMutex.withLock {
+                val file = issueFailureLogFile()
+                val lines = readIssueFailureLogRawLines(file)
+                _issueFailureLogs.value = extractIssueLogText(lines)
+            }
+        }
+    }
+
+    private fun issueFailureLogFile(): File {
+        return File(application.cacheDir, ISSUE_FAILURE_LOG_FILE)
+    }
+
+    private fun readIssueFailureLogRawLines(file: File): List<String> {
+        if (!file.exists()) return emptyList()
+        return file.readLines().map { it.trim() }.filter { it.isNotBlank() }
+    }
+
+    private fun extractIssueLogText(lines: List<String>): String {
+        return lines.joinToString("\n") { line ->
+            if (line.contains("|")) line.substringAfter("|").trim() else line
+        }.trim()
+    }
+
+    private fun buildFailureLogFingerprint(
+        action: String,
+        subId: Int?,
+        stage: String,
+        backendMessage: String,
+    ): String {
+        val normalized = buildString {
+            append(action.trim().lowercase(Locale.ROOT))
+            append("|")
+            append(subId ?: -99999)
+            append("|")
+            append(stage.trim().lowercase(Locale.ROOT))
+            append("|")
+            append(backendMessage.trim().lowercase(Locale.ROOT).replace(Regex("\\s+"), " "))
+        }
+        val digest = MessageDigest.getInstance("SHA-256").digest(normalized.toByteArray())
+        return digest.joinToString(separator = "") { "%02x".format(it) }.take(16)
+    }
+
+    private suspend fun maybeRestoreSavedConfigurationAfterBoot() {
+        if (!pendingConfigRestoreAfterBoot || restoringConfigAfterBoot) return
+        restoringConfigAfterBoot = true
+        try {
+            val result = restoreSavedConfigurationAfterBoot()
+            pendingConfigRestoreAfterBoot = false
+            if (result.attempted > 0) {
+                Log.i(
+                    TAG,
+                    "auto restore saved config after boot finished: attempted=${result.attempted}, success=${result.success}, failed=${result.failed}"
+                )
+            }
+        } finally {
+            restoringConfigAfterBoot = false
+        }
+    }
+
+    private suspend fun restoreSavedConfigurationAfterBoot(): BootRestoreResult {
+        var attempted = 0
+        var success = 0
+        var failed = 0
+        val simList = _allSimList.value.filter { it.subId >= 0 }
+        for (sim in simList) {
+            val saved = loadConfiguration(sim.subId) ?: continue
+            attempted++
+            val resultMsg = onApplyConfiguration(sim, saved)
+            if (resultMsg == null) {
+                success++
+            } else {
+                failed++
+                Log.w(
+                    TAG,
+                    "auto restore saved config failed for subId=${sim.subId}, msg=$resultMsg"
+                )
+            }
+        }
+        return BootRestoreResult(attempted, success, failed)
     }
 }

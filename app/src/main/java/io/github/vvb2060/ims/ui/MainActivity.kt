@@ -171,6 +171,53 @@ private fun switchFeatureCategoryOrder(feature: Feature): Int {
     }
 }
 
+private fun defaultFeatureValue(feature: Feature): FeatureValue {
+    return FeatureValue(feature.defaultValue, feature.valueType)
+}
+
+private fun buildCompleteFeatureMap(source: Map<Feature, FeatureValue>): LinkedHashMap<Feature, FeatureValue> {
+    val completed = linkedMapOf<Feature, FeatureValue>()
+    Feature.entries.forEach { feature ->
+        completed[feature] = source[feature] ?: defaultFeatureValue(feature)
+    }
+    return completed
+}
+
+private fun syncFeatureState(
+    target: MutableMap<Feature, FeatureValue>,
+    source: Map<Feature, FeatureValue>,
+) {
+    target.clear()
+    target.putAll(buildCompleteFeatureMap(source))
+}
+
+private fun buildIssueBody(
+    context: Context,
+    systemInfo: SystemInfo,
+    shizukuStatus: ShizukuStatus,
+    issueFailureLogs: String,
+): String {
+    val shizukuStatusText = when (shizukuStatus) {
+        ShizukuStatus.CHECKING -> context.getString(R.string.shizuku_checking)
+        ShizukuStatus.NOT_RUNNING -> context.getString(R.string.shizuku_not_running)
+        ShizukuStatus.NO_PERMISSION -> context.getString(R.string.shizuku_no_permission)
+        ShizukuStatus.READY -> context.getString(R.string.shizuku_ready)
+        else -> "UNKNOWN"
+    }
+    return buildString {
+        appendLine("App Version: ${systemInfo.appVersionName}")
+        appendLine("Device Model: ${systemInfo.deviceModel}")
+        appendLine("Android Version: ${systemInfo.androidVersion}")
+        appendLine("Patch Date: ${systemInfo.securityPatchVersion}")
+        appendLine("Shizuku Status: $shizukuStatusText")
+        if (issueFailureLogs.isNotBlank()) {
+            appendLine()
+            appendLine("Switch Failure Logs:")
+            append(issueFailureLogs)
+        }
+    }.trim()
+}
+
 class MainActivity : BaseActivity() {
     private val viewModel: MainViewModel by viewModels()
     private var pendingUpdateDownloadId: Long = -1L
@@ -203,18 +250,38 @@ class MainActivity : BaseActivity() {
         val systemInfo by viewModel.systemInfo.collectAsStateWithLifecycle()
         val shizukuStatus by viewModel.shizukuStatus.collectAsStateWithLifecycle()
         val allSimList by viewModel.allSimList.collectAsStateWithLifecycle()
+        val issueFailureLogs by viewModel.issueFailureLogs.collectAsStateWithLifecycle()
+        val uriHandler = LocalUriHandler.current
+        val clipboardManager = context.getSystemService(ClipboardManager::class.java)
 
         val scope = rememberCoroutineScope()
         var selectedSim by remember { mutableStateOf<SimSelection?>(null) }
         var showShizukuUpdateDialog by remember { mutableStateOf(false) }
         var pendingAutoSelectSimAfterReady by remember { mutableStateOf(false) }
-        var imsRegistrationStatus by remember { mutableStateOf<Boolean?>(null) }
-        var imsRegistrationLoading by remember { mutableStateOf(false) }
+        val imsRegistrationStatusMap = remember { mutableStateMapOf<Int, Boolean?>() }
+        val imsRegistrationLoadingMap = remember { mutableStateMapOf<Int, Boolean>() }
         var applyingConfiguration by remember { mutableStateOf(false) }
         var checkingUpdate by remember { mutableStateOf(false) }
         var updateDialogState by remember { mutableStateOf<UpdateDialogState?>(null) }
         var applyResultDialogState by remember { mutableStateOf<ApplyResultDialogState?>(null) }
         val featureSwitches = remember { mutableStateMapOf<Feature, FeatureValue>() }
+        val committedFeatureSwitches = remember { mutableStateMapOf<Feature, FeatureValue>() }
+        val submitIssueAction: () -> Unit = {
+            val issueBody = buildIssueBody(
+                context = context,
+                systemInfo = systemInfo,
+                shizukuStatus = shizukuStatus,
+                issueFailureLogs = issueFailureLogs
+            )
+            clipboardManager?.setPrimaryClip(
+                ClipData.newPlainText(
+                    "turboims_issue_info",
+                    issueBody
+                )
+            )
+            Toast.makeText(context, R.string.issue_info_copied, Toast.LENGTH_SHORT).show()
+            uriHandler.openUri(REPO_ISSUE_URL)
+        }
 
         LaunchedEffect(shizukuStatus) {
             if (shizukuStatus == ShizukuStatus.NEED_UPDATE) {
@@ -223,6 +290,13 @@ class MainActivity : BaseActivity() {
             pendingAutoSelectSimAfterReady = shizukuStatus == ShizukuStatus.READY
         }
         LaunchedEffect(allSimList) {
+            val validSubIds = allSimList.filter { it.subId >= 0 }.map { it.subId }.toSet()
+            imsRegistrationStatusMap.keys.toList()
+                .filterNot { validSubIds.contains(it) }
+                .forEach { imsRegistrationStatusMap.remove(it) }
+            imsRegistrationLoadingMap.keys.toList()
+                .filterNot { validSubIds.contains(it) }
+                .forEach { imsRegistrationLoadingMap.remove(it) }
             val currentSelected = selectedSim
             if (currentSelected == null) {
                 selectedSim = allSimList.firstOrNull()
@@ -243,31 +317,42 @@ class MainActivity : BaseActivity() {
             }
             pendingAutoSelectSimAfterReady = false
         }
-        LaunchedEffect(selectedSim, shizukuStatus) {
+        LaunchedEffect(selectedSim, shizukuStatus, allSimList) {
             if (selectedSim != null) {
-                featureSwitches.clear()
+                committedFeatureSwitches.clear()
                 val currentConfig = if (shizukuStatus == ShizukuStatus.READY && selectedSim!!.subId >= 0) {
                     viewModel.loadCurrentConfiguration(selectedSim!!.subId)
                 } else {
                     null
                 }
                 if (currentConfig != null) {
-                    featureSwitches.putAll(currentConfig)
+                    committedFeatureSwitches.putAll(currentConfig)
                 } else {
                     val savedConfig = viewModel.loadConfiguration(selectedSim!!.subId)
                     if (savedConfig != null) {
-                        featureSwitches.putAll(savedConfig)
+                        committedFeatureSwitches.putAll(savedConfig)
                     } else {
-                        featureSwitches.putAll(viewModel.loadDefaultPreferences())
+                        committedFeatureSwitches.putAll(viewModel.loadDefaultPreferences())
                     }
                 }
-
-                imsRegistrationStatus =
-                    if (shizukuStatus == ShizukuStatus.READY && selectedSim!!.subId >= 0) {
-                        viewModel.readImsRegistrationStatus(selectedSim!!.subId)
-                    } else {
-                        null
+                syncFeatureState(featureSwitches, committedFeatureSwitches)
+                if (selectedSim!!.subId >= 0) {
+                    imsRegistrationStatusMap[selectedSim!!.subId] =
+                        if (shizukuStatus == ShizukuStatus.READY) {
+                            viewModel.readImsRegistrationStatus(selectedSim!!.subId)
+                        } else {
+                            null
+                        }
+                } else {
+                    allSimList.filter { it.subId >= 0 }.forEach { sim ->
+                        imsRegistrationStatusMap[sim.subId] =
+                            if (shizukuStatus == ShizukuStatus.READY) {
+                                viewModel.readImsRegistrationStatus(sim.subId)
+                            } else {
+                                null
+                            }
                     }
+                }
             }
         }
 
@@ -364,6 +449,7 @@ class MainActivity : BaseActivity() {
                             )
                         }
                     },
+                    onIssueClick = submitIssueAction,
                 )
                 if (shizukuStatus == ShizukuStatus.READY) {
                     SimCardSelectionCard(selectedSim, allSimList, onSelectSim = {
@@ -382,33 +468,147 @@ class MainActivity : BaseActivity() {
                     })
                     FeaturesCard(
                         isSelectAllSim = selectedSim?.subId == -1,
+                        allSimList = allSimList,
                         selectedSim = selectedSim,
-                        imsRegistrationStatus = imsRegistrationStatus,
-                        imsRegistrationLoading = imsRegistrationLoading,
-                        onImsRegistrationToggle = { targetChecked ->
+                        imsRegistrationStatusBySubId = imsRegistrationStatusMap,
+                        imsRegistrationLoadingBySubId = imsRegistrationLoadingMap,
+                        featureSwitchesEnabled = !applyingConfiguration,
+                        onImsRegistrationToggle = { subId, targetChecked ->
                             if (!targetChecked) return@FeaturesCard
-                            val sim = selectedSim
-                            if (sim == null || sim.subId < 0) {
-                                Toast.makeText(context, R.string.select_single_sim, Toast.LENGTH_SHORT).show()
-                                return@FeaturesCard
-                            }
+                            if (applyingConfiguration) return@FeaturesCard
                             if (shizukuStatus != ShizukuStatus.READY) {
                                 Toast.makeText(context, R.string.shizuku_not_running_msg, Toast.LENGTH_LONG).show()
                                 return@FeaturesCard
                             }
+                            val sim = allSimList.firstOrNull { it.subId == subId }
+                            if (sim == null) {
+                                Toast.makeText(context, R.string.select_single_sim, Toast.LENGTH_SHORT).show()
+                                return@FeaturesCard
+                            }
                             scope.launch {
-                                imsRegistrationLoading = true
-                                val registered = viewModel.registerIms(sim.subId)
-                                imsRegistrationStatus = registered
-                                imsRegistrationLoading = false
+                                applyingConfiguration = true
+                                imsRegistrationLoadingMap[subId] = true
+                                val oldVolteUi =
+                                    featureSwitches[Feature.VOLTE] ?: defaultFeatureValue(Feature.VOLTE)
+                                val oldVowifiUi =
+                                    featureSwitches[Feature.VOWIFI] ?: defaultFeatureValue(Feature.VOWIFI)
+                                val oldVolteCommitted =
+                                    committedFeatureSwitches[Feature.VOLTE] ?: defaultFeatureValue(Feature.VOLTE)
+                                val oldVowifiCommitted =
+                                    committedFeatureSwitches[Feature.VOWIFI] ?: defaultFeatureValue(Feature.VOWIFI)
+                                try {
+                                    val enabledValue = FeatureValue(true, FeatureValueType.BOOLEAN)
+                                    featureSwitches[Feature.VOLTE] = enabledValue
+                                    featureSwitches[Feature.VOWIFI] = enabledValue
+                                    committedFeatureSwitches[Feature.VOLTE] = enabledValue
+                                    committedFeatureSwitches[Feature.VOWIFI] = enabledValue
+                                    Toast.makeText(
+                                        context,
+                                        R.string.ims_register_apply_then_register,
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                    val applyResultMsg = viewModel.onApplyConfiguration(
+                                        sim,
+                                        buildCompleteFeatureMap(committedFeatureSwitches)
+                                    )
+                                    if (applyResultMsg != null) {
+                                        viewModel.appendSwitchFailureLog(
+                                            action = "IMS_REGISTER",
+                                            subId = sim.subId,
+                                            stage = "apply_before_register",
+                                            backendMessage = applyResultMsg
+                                        )
+                                        featureSwitches[Feature.VOLTE] = oldVolteUi
+                                        featureSwitches[Feature.VOWIFI] = oldVowifiUi
+                                        committedFeatureSwitches[Feature.VOLTE] = oldVolteCommitted
+                                        committedFeatureSwitches[Feature.VOWIFI] = oldVowifiCommitted
+                                        Toast.makeText(
+                                            context,
+                                            context.getString(R.string.ims_register_apply_failed, applyResultMsg),
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                        return@launch
+                                    }
+                                    val registerResult = viewModel.registerIms(sim.subId)
+                                    imsRegistrationStatusMap[subId] = registerResult.registered
+                                    if (registerResult.backendErrorMessage != null) {
+                                        viewModel.appendSwitchFailureLog(
+                                            action = "IMS_REGISTER",
+                                            subId = sim.subId,
+                                            stage = "restart_ims",
+                                            backendMessage = registerResult.backendErrorMessage
+                                        )
+                                    }
+                                } finally {
+                                    imsRegistrationLoadingMap[subId] = false
+                                    applyingConfiguration = false
+                                }
                             }
                         },
                         featureSwitches,
                         onFeatureSwitchChange = { feature, value ->
-                            featureSwitches[feature] = value
+                            when (feature.valueType) {
+                                FeatureValueType.STRING -> {
+                                    featureSwitches[feature] = value
+                                }
+
+                                FeatureValueType.BOOLEAN -> {
+                                    val sim = selectedSim
+                                    val previousUiValue =
+                                        featureSwitches[feature] ?: defaultFeatureValue(feature)
+                                    val previousCommittedValue =
+                                        committedFeatureSwitches[feature] ?: defaultFeatureValue(feature)
+                                    featureSwitches[feature] = value
+                                    committedFeatureSwitches[feature] = value
+                                    if (applyingConfiguration) {
+                                        featureSwitches[feature] = previousUiValue
+                                        committedFeatureSwitches[feature] = previousCommittedValue
+                                        return@FeaturesCard
+                                    }
+                                    if (sim == null || shizukuStatus != ShizukuStatus.READY) {
+                                        featureSwitches[feature] = previousUiValue
+                                        committedFeatureSwitches[feature] = previousCommittedValue
+                                        Toast.makeText(
+                                            context,
+                                            R.string.shizuku_not_running_msg,
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                        return@FeaturesCard
+                                    }
+                                    scope.launch {
+                                        applyingConfiguration = true
+                                        try {
+                                            val resultMsg = viewModel.onApplyConfiguration(
+                                                sim,
+                                                buildCompleteFeatureMap(committedFeatureSwitches)
+                                            )
+                                            if (resultMsg != null) {
+                                                if ((value.data as? Boolean) == true) {
+                                                    viewModel.appendSwitchFailureLog(
+                                                        action = feature.name,
+                                                        subId = sim.subId.takeIf { it >= 0 },
+                                                        stage = "apply_switch_enable",
+                                                        backendMessage = resultMsg
+                                                    )
+                                                }
+                                                featureSwitches[feature] = previousUiValue
+                                                committedFeatureSwitches[feature] = previousCommittedValue
+                                                Toast.makeText(
+                                                    context,
+                                                    context.getString(R.string.config_failed, resultMsg),
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            }
+                                        } finally {
+                                            applyingConfiguration = false
+                                        }
+                                    }
+                                }
+                            }
                         },
                         loadCurrentConfig = {
                             scope.launch {
+                                if (applyingConfiguration) return@launch
                                 if (selectedSim == null) return@launch
                                 if (shizukuStatus != ShizukuStatus.READY) {
                                     Toast.makeText(context, R.string.shizuku_not_running_msg, Toast.LENGTH_LONG).show()
@@ -418,96 +618,112 @@ class MainActivity : BaseActivity() {
                                     Toast.makeText(context, R.string.select_single_sim, Toast.LENGTH_SHORT).show()
                                     return@launch
                                 }
-                                featureSwitches.clear()
-                                val currentConfig = viewModel.loadCurrentConfiguration(selectedSim!!.subId)
-                                if (currentConfig != null) {
-                                    featureSwitches.putAll(currentConfig)
-                                    Toast.makeText(context, R.string.load_config_current_success, Toast.LENGTH_SHORT).show()
-                                } else {
-                                    featureSwitches.putAll(viewModel.loadDefaultPreferences())
-                                    Toast.makeText(context, R.string.load_config_default_success, Toast.LENGTH_SHORT).show()
+                                applyingConfiguration = true
+                                try {
+                                    val currentConfig = viewModel.loadCurrentConfiguration(selectedSim!!.subId)
+                                    if (currentConfig != null) {
+                                        syncFeatureState(committedFeatureSwitches, currentConfig)
+                                        syncFeatureState(featureSwitches, committedFeatureSwitches)
+                                        Toast.makeText(context, R.string.load_config_current_success, Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        syncFeatureState(committedFeatureSwitches, viewModel.loadDefaultPreferences())
+                                        syncFeatureState(featureSwitches, committedFeatureSwitches)
+                                        Toast.makeText(context, R.string.load_config_default_success, Toast.LENGTH_SHORT).show()
+                                    }
+                                } finally {
+                                    applyingConfiguration = false
                                 }
                             }
                         },
                         resetFeatures = {
-                            featureSwitches.clear()
-                            featureSwitches.putAll(viewModel.loadDefaultPreferences())
-                            Toast.makeText(context, R.string.load_config_default_success, Toast.LENGTH_SHORT).show()
-                        }
-                    )
-                    MainActionButtons(
-                        onApplyConfiguration = {
-                            val sim = selectedSim
-                            if (sim == null) {
-                                Toast.makeText(context, R.string.select_single_sim, Toast.LENGTH_SHORT).show()
-                                return@MainActionButtons
-                            }
-                            if (shizukuStatus != ShizukuStatus.READY) {
-                                Toast.makeText(context, R.string.shizuku_not_running_msg, Toast.LENGTH_LONG).show()
-                                return@MainActionButtons
-                            }
-                            if (applyingConfiguration) {
-                                return@MainActionButtons
-                            }
-                            scope.launch {
-                                applyingConfiguration = true
-                                Toast.makeText(context, R.string.config_apply_in_progress, Toast.LENGTH_SHORT).show()
-                                val resultMsg = viewModel.onApplyConfiguration(sim, featureSwitches)
-                                applyingConfiguration = false
-                                applyResultDialogState = if (resultMsg == null) {
-                                    ApplyResultDialogState(
-                                        success = true,
-                                        message = context.getString(R.string.config_apply_success_message)
-                                    )
-                                } else {
-                                    ApplyResultDialogState(
-                                        success = false,
-                                        message = context.getString(R.string.config_failed, resultMsg)
-                                    )
-                                }
-                            }
-                        },
-                        onResetConfiguration = {
-                            val sim = selectedSim
-                            if (sim == null) {
-                                Toast.makeText(context, R.string.select_single_sim, Toast.LENGTH_SHORT).show()
-                                return@MainActionButtons
-                            }
-                            if (shizukuStatus != ShizukuStatus.READY) {
-                                Toast.makeText(context, R.string.shizuku_not_running_msg, Toast.LENGTH_LONG).show()
-                                return@MainActionButtons
-                            }
-                            scope.launch {
-                                val success = viewModel.onResetConfiguration(sim)
-                                if (!success) return@launch
-
-                                featureSwitches.clear()
-                                if (sim.subId < 0) {
-                                    featureSwitches.putAll(viewModel.loadDefaultPreferences())
-                                } else {
-                                    val currentConfig = viewModel.loadCurrentConfiguration(sim.subId)
-                                    if (currentConfig != null) {
-                                        featureSwitches.putAll(currentConfig)
-                                    } else {
-                                        featureSwitches.putAll(viewModel.loadDefaultPreferences())
-                                    }
-                                }
-                            }
-                        },
-                        onDumpConfig = {
                             val sim = selectedSim
                             if (sim == null || sim.subId < 0) {
                                 Toast.makeText(context, R.string.select_single_sim, Toast.LENGTH_SHORT).show()
-                                return@MainActionButtons
+                                return@FeaturesCard
                             }
-                            startActivity(
-                                Intent(
-                                    this@MainActivity,
-                                    DumpActivity::class.java
-                                ).putExtra(DumpActivity.EXTRA_SUB_ID, sim.subId)
-                            )
-                        },
-                        applyingConfiguration = applyingConfiguration
+                            if (shizukuStatus != ShizukuStatus.READY) {
+                                Toast.makeText(context, R.string.shizuku_not_running_msg, Toast.LENGTH_LONG).show()
+                                return@FeaturesCard
+                            }
+                            if (applyingConfiguration) {
+                                return@FeaturesCard
+                            }
+                            scope.launch {
+                                applyingConfiguration = true
+                                try {
+                                    val success = viewModel.onResetConfiguration(sim)
+                                    if (!success) return@launch
+                                    val currentConfig = viewModel.loadCurrentConfiguration(sim.subId)
+                                    if (currentConfig != null) {
+                                        syncFeatureState(committedFeatureSwitches, currentConfig)
+                                        syncFeatureState(featureSwitches, committedFeatureSwitches)
+                                        imsRegistrationStatusMap[sim.subId] =
+                                            viewModel.readImsRegistrationStatus(sim.subId)
+                                    } else {
+                                        syncFeatureState(committedFeatureSwitches, viewModel.loadDefaultPreferences())
+                                        syncFeatureState(featureSwitches, committedFeatureSwitches)
+                                    }
+                                } finally {
+                                    applyingConfiguration = false
+                                }
+                            }
+                        }
+                    )
+                    if (selectedSim?.subId != -1) {
+                        MainActionButtons(
+                            onApplyConfiguration = {
+                                val sim = selectedSim
+                                if (sim == null) {
+                                    Toast.makeText(context, R.string.select_single_sim, Toast.LENGTH_SHORT).show()
+                                    return@MainActionButtons
+                                }
+                                if (shizukuStatus != ShizukuStatus.READY) {
+                                    Toast.makeText(context, R.string.shizuku_not_running_msg, Toast.LENGTH_LONG).show()
+                                    return@MainActionButtons
+                                }
+                                if (applyingConfiguration) {
+                                    return@MainActionButtons
+                                }
+                                scope.launch {
+                                    applyingConfiguration = true
+                                    Toast.makeText(context, R.string.config_apply_in_progress, Toast.LENGTH_SHORT).show()
+                                    val mapToApply = buildCompleteFeatureMap(featureSwitches)
+                                    val resultMsg = viewModel.onApplyConfiguration(sim, mapToApply)
+                                    applyingConfiguration = false
+                                    applyResultDialogState = if (resultMsg == null) {
+                                        syncFeatureState(committedFeatureSwitches, mapToApply)
+                                        ApplyResultDialogState(
+                                            success = true,
+                                            message = context.getString(R.string.config_apply_success_message)
+                                        )
+                                    } else {
+                                        ApplyResultDialogState(
+                                            success = false,
+                                            message = context.getString(R.string.config_failed, resultMsg)
+                                        )
+                                    }
+                                }
+                            },
+                            onDumpConfig = {
+                                val sim = selectedSim
+                                if (sim == null || sim.subId < 0) {
+                                    Toast.makeText(context, R.string.select_single_sim, Toast.LENGTH_SHORT).show()
+                                    return@MainActionButtons
+                                }
+                                startActivity(
+                                    Intent(
+                                        this@MainActivity,
+                                        DumpActivity::class.java
+                                    ).putExtra(DumpActivity.EXTRA_SUB_ID, sim.subId)
+                                )
+                            },
+                            applyingConfiguration = applyingConfiguration
+                        )
+                    }
+                }
+                if (issueFailureLogs.isNotBlank()) {
+                    IssueReportHintCard(
+                        onSubmitIssue = submitIssueAction
                     )
                 }
                 Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
@@ -745,10 +961,9 @@ fun SystemInfoCard(
     checkingUpdate: Boolean,
     onCheckUpdate: () -> Unit,
     onLogcatClick: () -> Unit,
+    onIssueClick: () -> Unit,
 ) {
     val uriHandler = LocalUriHandler.current
-    val context = LocalContext.current
-    val clipboardManager = context.getSystemService(ClipboardManager::class.java)
     val shizukuStatusText = when (shizukuStatus) {
         ShizukuStatus.CHECKING -> stringResource(R.string.shizuku_checking)
         ShizukuStatus.NOT_RUNNING -> stringResource(R.string.shizuku_not_running)
@@ -787,23 +1002,7 @@ fun SystemInfoCard(
                     HeaderActionChip(
                         icon = painterResource(R.drawable.ic_issue),
                         label = stringResource(R.string.action_issue),
-                        onClick = {
-                            val issueBody = buildString {
-                                appendLine("App Version: ${systemInfo.appVersionName}")
-                                appendLine("Device Model: ${systemInfo.deviceModel}")
-                                appendLine("Android Version: ${systemInfo.androidVersion}")
-                                appendLine("Patch Date: ${systemInfo.securityPatchVersion}")
-                                append("Shizuku Status: $shizukuStatusText")
-                            }
-                            clipboardManager?.setPrimaryClip(
-                                ClipData.newPlainText(
-                                    "turboims_system_info",
-                                    issueBody
-                                )
-                            )
-                            Toast.makeText(context, R.string.issue_info_copied, Toast.LENGTH_SHORT).show()
-                            uriHandler.openUri(REPO_ISSUE_URL)
-                        },
+                        onClick = onIssueClick,
                     )
                     HeaderActionChip(
                         icon = painterResource(R.drawable.ic_update),
@@ -962,10 +1161,12 @@ fun SimCardSelectionCard(
 @Composable
 fun FeaturesCard(
     isSelectAllSim: Boolean,
+    allSimList: List<SimSelection>,
     selectedSim: SimSelection?,
-    imsRegistrationStatus: Boolean?,
-    imsRegistrationLoading: Boolean,
-    onImsRegistrationToggle: (Boolean) -> Unit,
+    imsRegistrationStatusBySubId: Map<Int, Boolean?>,
+    imsRegistrationLoadingBySubId: Map<Int, Boolean>,
+    featureSwitchesEnabled: Boolean = true,
+    onImsRegistrationToggle: (Int, Boolean) -> Unit,
     featureSwitches: Map<Feature, FeatureValue>,
     onFeatureSwitchChange: (Feature, FeatureValue) -> Unit,
     loadCurrentConfig: () -> Unit,
@@ -977,13 +1178,14 @@ fun FeaturesCard(
             .padding(16.dp),
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                if (!isSelectAllSim) {
+            if (!isSelectAllSim) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     Button(
                         onClick = loadCurrentConfig,
+                        enabled = featureSwitchesEnabled,
                         modifier = Modifier
                             .weight(1f)
                             .height(48.dp),
@@ -992,25 +1194,31 @@ fun FeaturesCard(
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(stringResource(R.string.action_sync_short), fontSize = 15.sp)
                     }
+                    Button(
+                        onClick = resetFeatures,
+                        enabled = featureSwitchesEnabled,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                    ) {
+                        Icon(Icons.Rounded.SettingsBackupRestore, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(stringResource(R.string.reset_config), fontSize = 15.sp)
+                    }
                 }
-                Button(
-                    onClick = resetFeatures,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
-                ) {
-                    Icon(Icons.Rounded.SettingsBackupRestore, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(stringResource(R.string.action_default_short), fontSize = 15.sp)
-                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = stringResource(R.string.reset_config_desc),
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.outline
+                )
+                Spacer(modifier = Modifier.height(8.dp))
             }
-            Spacer(modifier = Modifier.height(8.dp))
 
             val showFeatures = Feature.entries.toMutableList()
             if (isSelectAllSim) {
-                showFeatures.remove(Feature.CARRIER_NAME)
-                showFeatures.remove(Feature.COUNTRY_ISO)
+                showFeatures.removeAll { it.valueType == FeatureValueType.STRING }
             }
             val orderedFeatures = showFeatures.sortedWith(
                 compareBy<Feature>(
@@ -1019,16 +1227,47 @@ fun FeaturesCard(
                     { Feature.entries.indexOf(it) },
                 )
             )
+            Text(
+                text = stringResource(R.string.all_sim_switch_only_desc),
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.outline
+            )
+            Spacer(modifier = Modifier.height(6.dp))
             if (!isSelectAllSim) {
+                val selectedSubId = selectedSim?.subId
+                val checked = selectedSubId != null && imsRegistrationStatusBySubId[selectedSubId] == true
+                val loading = selectedSubId != null && imsRegistrationLoadingBySubId[selectedSubId] == true
                 BooleanFeatureItem(
                     title = stringResource(R.string.ims_registration_status),
                     description = stringResource(R.string.ims_registration_status_desc),
-                    checked = imsRegistrationStatus == true,
-                    enabled = !imsRegistrationLoading,
-                    onCheckedChange = onImsRegistrationToggle,
+                    checked = checked,
+                    enabled = !loading && featureSwitchesEnabled,
+                    onCheckedChange = { targetChecked ->
+                        if (selectedSubId == null || selectedSubId < 0) return@BooleanFeatureItem
+                        onImsRegistrationToggle(selectedSubId, targetChecked)
+                    },
                 )
                 if (orderedFeatures.isNotEmpty()) {
                     HorizontalDivider(thickness = 0.5.dp)
+                }
+            } else {
+                val realSims = allSimList.filter { it.subId >= 0 }
+                realSims.forEachIndexed { index, sim ->
+                    val checked = imsRegistrationStatusBySubId[sim.subId] == true
+                    val loading = imsRegistrationLoadingBySubId[sim.subId] == true
+                    BooleanFeatureItem(
+                        title = "${stringResource(R.string.ims_registration_status)} · ${sim.showTitle}",
+                        description = stringResource(R.string.ims_registration_status_desc),
+                        checked = checked,
+                        enabled = !loading && featureSwitchesEnabled,
+                        onCheckedChange = { targetChecked ->
+                            onImsRegistrationToggle(sim.subId, targetChecked)
+                        },
+                    )
+                    val hasMoreRows = index < realSims.lastIndex
+                    if (hasMoreRows || orderedFeatures.isNotEmpty()) {
+                        HorizontalDivider(thickness = 0.5.dp)
+                    }
                 }
             }
             orderedFeatures.forEachIndexed { index, feature ->
@@ -1084,6 +1323,7 @@ fun FeaturesCard(
                             title = title,
                             description = description,
                             checked = (featureSwitches[feature]?.data ?: feature.defaultValue) as Boolean,
+                            enabled = featureSwitchesEnabled,
                             onCheckedChange = {
                                 onFeatureSwitchChange(
                                     feature,
@@ -1452,7 +1692,6 @@ fun BooleanFeatureItem(
 @Composable
 fun MainActionButtons(
     onApplyConfiguration: () -> Unit,
-    onResetConfiguration: () -> Unit,
     onDumpConfig: () -> Unit,
     applyingConfiguration: Boolean = false,
 ) {
@@ -1480,16 +1719,6 @@ fun MainActionButtons(
             )
         }
         Button(
-            onClick = onResetConfiguration,
-            enabled = !applyingConfiguration,
-            modifier = Modifier
-                .weight(1f)
-                .height(52.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
-        ) {
-            Text(text = stringResource(id = R.string.reset_config))
-        }
-        Button(
             onClick = onDumpConfig,
             enabled = !applyingConfiguration,
             modifier = Modifier
@@ -1498,6 +1727,43 @@ fun MainActionButtons(
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
         ) {
             Text(text = stringResource(id = R.string.dump_config))
+        }
+    }
+}
+
+@Composable
+private fun IssueReportHintCard(
+    onSubmitIssue: () -> Unit,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.issue_failure_hint_title),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = stringResource(R.string.issue_failure_hint_desc),
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.outline
+                )
+            }
+            Button(
+                onClick = onSubmitIssue,
+                modifier = Modifier.height(40.dp),
+            ) {
+                Text(text = stringResource(R.string.issue_failure_submit))
+            }
         }
     }
 }

@@ -1,6 +1,5 @@
 package io.github.vvb2060.ims.privileged
 
-import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.IActivityManager
 import android.app.Instrumentation
@@ -38,6 +37,8 @@ class BrokerInstrumentation : Instrumentation() {
             arguments.remove(ImsModifier.BUNDLE_SELECT_SIM_ID)
             val reset = arguments.getBoolean(ImsModifier.BUNDLE_RESET, false)
             arguments.remove(ImsModifier.BUNDLE_RESET)
+            val preferPersistent = arguments.getBoolean(ImsModifier.BUNDLE_PREFER_PERSISTENT, false)
+            arguments.remove(ImsModifier.BUNDLE_PREFER_PERSISTENT)
 
             val subIds: IntArray = if (selectedSubId == -1) {
                 sm.javaClass.getMethod("getActiveSubscriptionIdList").invoke(sm) as IntArray
@@ -45,23 +46,16 @@ class BrokerInstrumentation : Instrumentation() {
                 intArrayOf(selectedSubId)
             }
 
-            val values = if (reset) null else toPersistableBundle(arguments)
+            val baseValues = if (reset) null else toPersistableBundle(arguments)
             for (subId in subIds) {
+                val values = baseValues?.let { PersistableBundle(it) }
                 Log.i(TAG, "overrideConfig for subId $subId with values $values")
-            try {
-                cm.javaClass.getMethod(
-                    "overrideConfig",
-                    Int::class.javaPrimitiveType,
-                    PersistableBundle::class.java,
-                    Boolean::class.javaPrimitiveType
-                ).invoke(cm, subId, values, false)
-            } catch (_: NoSuchMethodException) {
-                cm.javaClass.getMethod(
-                    "overrideConfig",
-                    Int::class.javaPrimitiveType,
-                    PersistableBundle::class.java
-                ).invoke(cm, subId, values)
-            }
+                applyOverrideConfig(
+                    cm,
+                    subId,
+                    values,
+                    preferPersistent = preferPersistent
+                )
             }
             result.putBoolean(ImsModifier.BUNDLE_RESULT, true)
         } catch (t: Throwable) {
@@ -73,6 +67,59 @@ class BrokerInstrumentation : Instrumentation() {
         }
 
         finish(Activity.RESULT_OK, result)
+    }
+
+    @Throws(Exception::class)
+    private fun applyOverrideConfig(
+        cm: CarrierConfigManager,
+        subId: Int,
+        values: PersistableBundle?,
+        preferPersistent: Boolean,
+    ) {
+        if (!preferPersistent) {
+            invokeOverrideConfig(cm, subId, values, persistent = false)
+            return
+        }
+        try {
+            invokeOverrideConfig(cm, subId, values, persistent = true)
+            Log.i(TAG, "overrideConfig persistent success for subId $subId")
+        } catch (persistentError: Throwable) {
+            Log.w(
+                TAG,
+                "overrideConfig persistent failed for subId $subId, fallback to non-persistent",
+                persistentError
+            )
+            try {
+                invokeOverrideConfig(cm, subId, values, persistent = false)
+                Log.i(TAG, "overrideConfig fallback non-persistent success for subId $subId")
+            } catch (fallbackError: Throwable) {
+                fallbackError.addSuppressed(persistentError)
+                throw fallbackError
+            }
+        }
+    }
+
+    @Throws(Exception::class)
+    private fun invokeOverrideConfig(
+        cm: CarrierConfigManager,
+        subId: Int,
+        values: PersistableBundle?,
+        persistent: Boolean,
+    ) {
+        try {
+            cm.javaClass.getMethod(
+                "overrideConfig",
+                Int::class.javaPrimitiveType,
+                PersistableBundle::class.java,
+                Boolean::class.javaPrimitiveType
+            ).invoke(cm, subId, values, persistent)
+        } catch (_: NoSuchMethodException) {
+            cm.javaClass.getMethod(
+                "overrideConfig",
+                Int::class.javaPrimitiveType,
+                PersistableBundle::class.java
+            ).invoke(cm, subId, values)
+        }
     }
 
     @Suppress("UNCHECKED_CAST", "DEPRECATION")
