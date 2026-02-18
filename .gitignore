@@ -12,3 +12,6 @@ local.properties
 GEMINI.md
 .agentdocs
 turboims-debug.keystore
+NetworkStackOverlay.apk
+ServiceConnectivityResourcesGoogle.apk
+networkstack-base.apk
