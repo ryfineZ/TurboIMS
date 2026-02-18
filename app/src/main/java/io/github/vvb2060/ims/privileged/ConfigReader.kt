@@ -32,10 +32,16 @@ class ConfigReader : Instrumentation() {
         }
 
         val result = Bundle()
+        if (!waitForShizukuBinderReady()) {
+            finish(Activity.RESULT_OK, result)
+            return
+        }
         val binder = ServiceManager.getService(Context.ACTIVITY_SERVICE)
         val am = IActivityManager.Stub.asInterface(ShizukuBinderWrapper(binder))
-        am.startDelegateShellPermissionIdentity(Os.getuid(), null)
+        var delegated = false
         try {
+            am.startDelegateShellPermissionIdentity(Os.getuid(), null)
+            delegated = true
             val subId = arguments.getInt(BUNDLE_SELECT_SIM_ID, -1)
             val cm = context.getSystemService(CarrierConfigManager::class.java)
             val config = cm.getConfigForSubId(subId)
@@ -54,7 +60,10 @@ class ConfigReader : Instrumentation() {
         } catch (t: Throwable) {
             Log.e(TAG, "read config failed", t)
         } finally {
-            am.stopDelegateShellPermissionIdentity()
+            if (delegated) {
+                runCatching { am.stopDelegateShellPermissionIdentity() }
+                    .onFailure { Log.w(TAG, "stop delegate shell identity failed", it) }
+            }
         }
 
         finish(Activity.RESULT_OK, result)

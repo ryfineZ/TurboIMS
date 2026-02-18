@@ -36,7 +36,6 @@ object FeatureConfigMapper {
         CarrierConfigManager.KEY_ENABLE_CROSS_SIM_CALLING_ON_OPPORTUNISTIC_DATA_BOOL,
         KEY_VONR_ENABLED,
         KEY_VONR_SETTING_VISIBILITY,
-        CarrierConfigManager.Ims.KEY_IMS_USER_AGENT_STRING,
         KEY_SIM_COUNTRY_ISO_OVERRIDE,
     ).toTypedArray()
 
@@ -56,12 +55,10 @@ object FeatureConfigMapper {
 
         val countryIso = bundle.getStringOrDefault(KEY_SIM_COUNTRY_ISO_OVERRIDE, "")
         map[Feature.COUNTRY_ISO] = FeatureValue(countryIso, FeatureValueType.STRING)
-
-        val imsUserAgent = bundle.getStringOrDefault(
-            CarrierConfigManager.Ims.KEY_IMS_USER_AGENT_STRING,
-            ""
+        map[Feature.TIKTOK_NETWORK_FIX] = FeatureValue(
+            countryIso.isNotBlank() && countryIso.all { it.isDigit() },
+            FeatureValueType.BOOLEAN
         )
-        map[Feature.IMS_USER_AGENT] = FeatureValue(imsUserAgent, FeatureValueType.STRING)
 
         map[Feature.VOLTE] = FeatureValue(
             bundle.getBooleanOrDefault(

@@ -1,0 +1,113 @@
+# Carrier IMS for Pixel (TurboIMS)
+
+<p align="center">
+  <img src="app/src/main/ic_launcher-playstore.png" width="128" alt="Carrier IMS logo" />
+</p>
+
+<p align="center">
+  <strong>Carrier and IMS toolkit for Google Pixel</strong><br/>
+  Tune VoLTE / VoWiFi / VoNR, 5G display behavior, and network compatibility with Shizuku privileges.
+</p>
+
+<p align="center">
+  <a href="README.md">中文（默认）</a> | English
+</p>
+
+<p align="center">
+  <a href="https://github.com/ryfineZ/TurboIMS/releases"><img alt="Release" src="https://img.shields.io/github/v/release/ryfineZ/TurboIMS"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/ryfineZ/TurboIMS"></a>
+  <img alt="Platform" src="https://img.shields.io/badge/Platform-Android%2013%2B-3DDC84">
+  <img alt="Device" src="https://img.shields.io/badge/Device-Pixel%20Tensor-blue">
+  <img alt="Permission" src="https://img.shields.io/badge/Requires-Shizuku-orange">
+</p>
+
+## Positioning
+
+This project is a continuously maintained branch based on [Mystery00/TurboIMS](https://github.com/Mystery00/TurboIMS), with major usability and compatibility improvements for Mainland China and cross-region use cases.
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/Screenshot1.png" width="46%" alt="screenshot-1" />
+  <img src="docs/Screenshot2.png" width="46%" alt="screenshot-2" />
+</p>
+
+## Feature Matrix
+
+| Module | Capability | Notes |
+|---|---|---|
+| System Info | app/device/patch/Shizuku status | quick environment visibility |
+| IMS Registration | status query + manual register | one-tap register workflow |
+| Carrier Features | VoLTE / VoWiFi / VT / VoNR / UT / Cross-SIM | realtime switches, rollback on failure |
+| 5G Features | 5G NR / 5G signal threshold / 5G+ icon | optimized for common CN scenarios |
+| Network Fix | captive portal one-tap fix | fixes restricted/exclamation network states |
+| TikTok Fix | no-network fix for TikTok (Mainland SIM) | shown only for Mainland SIM |
+| Diagnostics | logs / full config view / issue shortcut | submit issues with useful context |
+| In-app Update | check, download, install updates | integrated with GitHub Releases |
+
+## Quick Start
+
+1. Download APK from [Releases](https://github.com/ryfineZ/TurboIMS/releases)
+2. Install and start [Shizuku](https://shizuku.rikka.app/)
+3. Open app and grant Shizuku permission
+4. Select SIM and toggle required features
+
+## Requirements
+
+- Pixel Tensor devices (Pixel 6/7/8/9/10, Fold, Tablet)
+- Android 13+
+- Shizuku running and authorized
+
+## Build (Developers)
+
+```bash
+./gradlew :app:assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+If local signing is required, configure `local.properties`:
+
+```properties
+SIGN_KEY_STORE_FILE=/path/to/your.keystore
+SIGN_KEY_STORE_PASSWORD=***
+SIGN_KEY_ALIAS=***
+SIGN_KEY_PASSWORD=***
+```
+
+## FAQ
+
+### IMS not registered
+
+- confirm Shizuku is ready
+- verify VoLTE / VoWiFi availability
+- collect logs and submit an issue
+
+### Network has signal but no internet
+
+- check APN first
+- then try the network verification fix card
+
+### TikTok still unavailable
+
+- TikTok fix switch only appears for Mainland SIM
+- restart target app or refresh its session after changes
+
+## Changelog
+
+- Full changelog: [CHANGELOG.md](CHANGELOG.md)
+- Releases: [GitHub Releases](https://github.com/ryfineZ/TurboIMS/releases)
+
+## Credits
+
+- [Mystery00/TurboIMS](https://github.com/Mystery00/TurboIMS)
+- [vvb2060/Ims](https://github.com/vvb2060/Ims)
+- [kyujin-cho/pixel-volte-patch](https://github.com/kyujin-cho/pixel-volte-patch)
+- [nullbytepl/CarrierVanityName](https://github.com/nullbytepl/CarrierVanityName)
+
+## Disclaimer
+
+This app modifies carrier-related system configuration for learning, testing, and personal tuning purposes. Use at your own risk.
+
+## License
+
+Apache-2.0

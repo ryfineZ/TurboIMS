@@ -19,4 +19,5 @@ data class SimSelection(
     val countryIso: String = "",
     val mcc: String = "",
     val mnc: String = "",
+    val iccId: String = "",
 )

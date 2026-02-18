@@ -24,6 +24,8 @@ import io.github.vvb2060.ims.model.SimSelection
 import io.github.vvb2060.ims.model.SystemInfo
 import io.github.vvb2060.ims.privileged.ImsModifier
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -47,9 +49,18 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
     companion object {
         private const val TAG = "MainViewModel"
         private const val RUNTIME_PREFS = "runtime_state"
+        private const val COUNTRY_MCC_PREF_KEY = "__country_mcc_override__"
+        private const val TIKTOK_RANDOM_ISO_PREF_KEY = "__tiktok_random_iso__"
         private const val KEY_LAST_BOOT_COUNT = "last_boot_count"
         private const val ISSUE_FAILURE_LOG_FILE = "issue_failure_logs.txt"
         private const val ISSUE_FAILURE_LOG_MAX_LINES = 200
+        private const val CAPTIVE_PORTAL_CHECK_TIMEOUT_MS = 2_500
+        private val DEFAULT_CAPTIVE_PORTAL_TEST_URLS = listOf(
+            "http://connectivitycheck.gstatic.cn/generate_204",
+            "https://www.google.cn/generate_204",
+            "https://connectivitycheck.gstatic.com/generate_204",
+            "https://www.google.com/generate_204"
+        )
     }
 
     private data class BootRestoreResult(
@@ -63,6 +74,18 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
         val backendErrorMessage: String?,
     )
 
+    enum class CaptivePortalFixMode {
+        NEED_FIX,
+        CAN_RESTORE,
+        NORMAL,
+    }
+
+    data class CaptivePortalFixState(
+        val mode: CaptivePortalFixMode,
+        val httpUrl: String,
+        val httpsUrl: String,
+    )
+
     private var toast: Toast? = null
     private val runtimePrefs = application.getSharedPreferences(RUNTIME_PREFS, Context.MODE_PRIVATE)
     private val issueFailureLogMutex = Mutex()
@@ -72,6 +95,75 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
         val flags = application.applicationInfo.flags
         (flags and ApplicationInfo.FLAG_SYSTEM) != 0 ||
             (flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+    }
+
+    private fun normalizeMcc(raw: String): String {
+        return raw.filter { it.isDigit() }.take(3)
+    }
+
+    private fun normalizeIso(raw: String): String {
+        return raw.trim().lowercase(Locale.US).filter { it.isLetterOrDigit() }.take(8)
+    }
+
+    private fun isChinaDomesticSim(selectedSim: SimSelection): Boolean {
+        val iccId = selectedSim.iccId.trim()
+        if (iccId.startsWith("8986")) return true
+        return normalizeMcc(selectedSim.mcc) == "460"
+    }
+
+    private fun resolveIsoByMcc(mccRaw: String, fallbackIsoRaw: String): String? {
+        val mcc = normalizeMcc(mccRaw)
+        val fallbackIso = normalizeIso(fallbackIsoRaw)
+        if (mcc.isBlank()) return fallbackIso.ifBlank { null }
+        val mccInt = mcc.toIntOrNull()
+        val iso = when {
+            mcc == "460" -> "cn"
+            mcc == "454" -> "hk"
+            mcc == "466" -> "tw"
+            mccInt != null && mccInt in 310..316 -> "us"
+            mccInt != null && mccInt in 440..441 -> "jp"
+            mccInt != null && mccInt in 234..235 -> "gb"
+            mcc == "450" -> "kr"
+            mcc == "525" -> "sg"
+            else -> fallbackIso
+        }
+        return iso.ifBlank { null }
+    }
+
+    private fun loadOrCreateTikTokRandomIso(subId: Int): String {
+        val prefs = application.getSharedPreferences("sim_config_$subId", Context.MODE_PRIVATE)
+        val existing = prefs.getString(TIKTOK_RANDOM_ISO_PREF_KEY, "")
+            .orEmpty()
+            .filter { it.isDigit() }
+            .take(6)
+        if (existing.length >= 3) return existing
+        val generated = (10000..99999).random().toString()
+        prefs.edit { putString(TIKTOK_RANDOM_ISO_PREF_KEY, generated) }
+        return generated
+    }
+
+    private fun clearTikTokRandomIso(subId: Int) {
+        application.getSharedPreferences("sim_config_$subId", Context.MODE_PRIVATE).edit {
+            remove(TIKTOK_RANDOM_ISO_PREF_KEY)
+        }
+    }
+
+    private fun resolveCountryIsoOverrideForApply(
+        selectedSim: SimSelection,
+        enableTikTokFix: Boolean,
+    ): String? {
+        if (selectedSim.subId < 0) return null
+        val linkedIso = resolveIsoByMcc(selectedSim.mcc, selectedSim.countryIso)
+        if (!enableTikTokFix) {
+            clearTikTokRandomIso(selectedSim.subId)
+            return linkedIso
+        }
+        // 仅国内 SIM 启用随机数字 ISO；海外 SIM 维持正常国家 ISO。
+        if (!isChinaDomesticSim(selectedSim)) {
+            clearTikTokRandomIso(selectedSim.subId)
+            return linkedIso
+        }
+        return loadOrCreateTikTokRandomIso(selectedSim.subId)
     }
 
     // 系统信息状态流
@@ -248,14 +340,22 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
      * 应用 IMS 配置到选定的 SIM 卡。
      * 此操作会调用 ShizukuProvider 进行特权操作，并保存当前配置到本地。
      */
-    suspend fun onApplyConfiguration(selectedSim: SimSelection, map: Map<Feature, FeatureValue>): String? {
+    suspend fun onApplyConfiguration(
+        selectedSim: SimSelection,
+        map: Map<Feature, FeatureValue>,
+        countryMccOverride: String? = null,
+    ): String? {
         // 构建传递给底层 ImsModifier 的配置 Bundle
-        val carrierName =
-            if (selectedSim.subId == -1) null else map[Feature.CARRIER_NAME]?.data as String?
+        val carrierName: String? = null
+        val enableTikTokFix = (map[Feature.TIKTOK_NETWORK_FIX]?.data ?: false) as Boolean
         val countryISO =
-            if (selectedSim.subId == -1) null else map[Feature.COUNTRY_ISO]?.data as String?
-        val imsUserAgent =
-            if (selectedSim.subId == -1) null else map[Feature.IMS_USER_AGENT]?.data as String?
+            if (selectedSim.subId == -1) null else resolveCountryIsoOverrideForApply(
+                selectedSim,
+                enableTikTokFix
+            )
+        val countryMcc: String? = null
+        val countryMnc =
+            if (selectedSim.subId == -1) null else selectedSim.mnc
         val enableVoLTE = (map[Feature.VOLTE]?.data ?: true) as Boolean
         val enableVoWiFi = (map[Feature.VOWIFI]?.data ?: true) as Boolean
         val enableVT = (map[Feature.VT]?.data ?: true) as Boolean
@@ -270,7 +370,8 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
         val bundle = ImsModifier.buildBundle(
             carrierName,
             countryISO,
-            imsUserAgent,
+            countryMcc,
+            countryMnc,
             enableVoLTE,
             enableVoWiFi,
             enableVT,
@@ -289,7 +390,7 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
         val resultMsg = ShizukuProvider.overrideImsConfig(application, bundle)
         if (resultMsg == null) {
             // 仅在应用成功后保存配置，避免本地状态与系统状态不一致
-            saveConfiguration(selectedSim.subId, map)
+            saveConfiguration(selectedSim.subId, map, countryMccOverride)
         }
         return resultMsg
     }
@@ -297,8 +398,15 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
     /**
      * 将配置保存到 SharedPreferences 中以便下次加载。
      */
-    private fun saveConfiguration(subId: Int, map: Map<Feature, FeatureValue>) {
-        application.getSharedPreferences("sim_config_$subId", Context.MODE_PRIVATE).edit {
+    private fun saveConfiguration(
+        subId: Int,
+        map: Map<Feature, FeatureValue>,
+        countryMccOverride: String?,
+    ) {
+        val prefs = application.getSharedPreferences("sim_config_$subId", Context.MODE_PRIVATE)
+        val keepTikTokRandomIso = prefs.getString(TIKTOK_RANDOM_ISO_PREF_KEY, null)
+        val tiktokEnabled = (map[Feature.TIKTOK_NETWORK_FIX]?.data as? Boolean) == true
+        prefs.edit {
             clear() // 清除旧配置
             map.forEach { (feature, value) ->
                 when (value.valueType) {
@@ -306,7 +414,21 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
                     FeatureValueType.STRING -> putString(feature.name, value.data as String)
                 }
             }
+            if (tiktokEnabled && !keepTikTokRandomIso.isNullOrBlank()) {
+                putString(TIKTOK_RANDOM_ISO_PREF_KEY, keepTikTokRandomIso)
+            } else {
+                remove(TIKTOK_RANDOM_ISO_PREF_KEY)
+            }
+            remove(COUNTRY_MCC_PREF_KEY)
         }
+    }
+
+    fun loadSavedCountryMccOverride(subId: Int): String {
+        if (subId < 0) return ""
+        return application
+            .getSharedPreferences("sim_config_$subId", Context.MODE_PRIVATE)
+            .getString(COUNTRY_MCC_PREF_KEY, "")
+            .orEmpty()
     }
 
     /**
@@ -382,6 +504,72 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
         return resultMsg
     }
 
+    suspend fun restoreCaptivePortalDefaultUrls(): String? {
+        val resultMsg = ShizukuProvider.restoreCaptivePortalDefaultUrls(application)
+        if (resultMsg != null) {
+            appendSwitchFailureLog(
+                action = "CAPTIVE_PORTAL_RESTORE",
+                subId = null,
+                stage = "restore_default_urls",
+                backendMessage = resultMsg
+            )
+        }
+        return resultMsg
+    }
+
+    suspend fun queryCaptivePortalFixState(): CaptivePortalFixState? {
+        val config = ShizukuProvider.queryCaptivePortalConfig(application) ?: return null
+        val currentConfigReachable = isPortalConfigReachable(config.httpUrl, config.httpsUrl)
+        val mode = when {
+            config.isOverridden && currentConfigReachable -> CaptivePortalFixMode.CAN_RESTORE
+            config.isOverridden -> CaptivePortalFixMode.NEED_FIX
+            isDefaultPortalCheckReachable() -> CaptivePortalFixMode.NORMAL
+            else -> CaptivePortalFixMode.NEED_FIX
+        }
+        return CaptivePortalFixState(
+            mode = mode,
+            httpUrl = config.httpUrl,
+            httpsUrl = config.httpsUrl
+        )
+    }
+
+    private suspend fun isDefaultPortalCheckReachable(): Boolean {
+        return withContext(Dispatchers.IO) {
+            DEFAULT_CAPTIVE_PORTAL_TEST_URLS.any { url -> isPortalUrlReachable(url) }
+        }
+    }
+
+    private suspend fun isPortalConfigReachable(httpUrl: String, httpsUrl: String): Boolean {
+        val targets = buildList {
+            if (httpUrl.isNotBlank()) add(httpUrl)
+            if (httpsUrl.isNotBlank()) add(httpsUrl)
+        }
+        if (targets.isEmpty()) return false
+        return withContext(Dispatchers.IO) {
+            targets.any { url -> isPortalUrlReachable(url) }
+        }
+    }
+
+    private fun isPortalUrlReachable(url: String): Boolean {
+        var connection: HttpURLConnection? = null
+        return try {
+            connection = (URL(url).openConnection() as HttpURLConnection).apply {
+                connectTimeout = CAPTIVE_PORTAL_CHECK_TIMEOUT_MS
+                readTimeout = CAPTIVE_PORTAL_CHECK_TIMEOUT_MS
+                requestMethod = "GET"
+                instanceFollowRedirects = false
+                useCaches = false
+            }
+            val code = connection.responseCode
+            code == HttpURLConnection.HTTP_NO_CONTENT
+        } catch (t: Throwable) {
+            Log.w(TAG, "portal reachability check failed: $url, msg=${t.message}")
+            false
+        } finally {
+            connection?.disconnect()
+        }
+    }
+
     /**
      * 重置选中 SIM 卡的配置到运营商默认状态。
      */
@@ -391,6 +579,13 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
         bundle.putBoolean(ImsModifier.BUNDLE_PREFER_PERSISTENT, canUsePersistentOverride)
         val resultMsg = ShizukuProvider.overrideImsConfig(application, bundle)
         if (resultMsg == null) {
+            application.getSharedPreferences(
+                "sim_config_${selectedSim.subId}",
+                Context.MODE_PRIVATE
+            ).edit {
+                remove(COUNTRY_MCC_PREF_KEY)
+                remove(TIKTOK_RANDOM_ISO_PREF_KEY)
+            }
             toast(application.getString(R.string.config_success_reset_message))
             return true
         }

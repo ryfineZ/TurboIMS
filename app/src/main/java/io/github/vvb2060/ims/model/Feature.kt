@@ -21,12 +21,6 @@ enum class Feature(
         R.string.country_iso_desc,
         "",
     ),
-    IMS_USER_AGENT(
-        FeatureValueType.STRING,
-        R.string.ims_user_agent,
-        R.string.ims_user_agent_desc,
-        "",
-    ),
     VOLTE(
         FeatureValueType.BOOLEAN,
         R.string.volte,
@@ -86,7 +80,13 @@ enum class Feature(
         R.string.show_4g_for_lte,
         R.string.show_4g_for_lte_desc,
         false,
-    )
+    ),
+    TIKTOK_NETWORK_FIX(
+        FeatureValueType.BOOLEAN,
+        R.string.tiktok_network_fix,
+        R.string.tiktok_network_fix_desc,
+        false,
+    ),
 }
 
 enum class FeatureValueType {

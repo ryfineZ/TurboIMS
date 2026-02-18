@@ -30,10 +30,18 @@ class ImsResetter : Instrumentation() {
         }
 
         val result = Bundle()
+        if (!waitForShizukuBinderReady()) {
+            result.putBoolean(BUNDLE_RESULT, false)
+            result.putString(BUNDLE_RESULT_MSG, "shizuku binder is not ready")
+            finish(Activity.RESULT_OK, result)
+            return
+        }
         val binder = ServiceManager.getService(Context.ACTIVITY_SERVICE)
         val am = IActivityManager.Stub.asInterface(ShizukuBinderWrapper(binder))
-        am.startDelegateShellPermissionIdentity(Os.getuid(), null)
+        var delegated = false
         try {
+            am.startDelegateShellPermissionIdentity(Os.getuid(), null)
+            delegated = true
             val subId = arguments.getInt(BUNDLE_SELECT_SIM_ID, -1)
             val sm = context.getSystemService(SubscriptionManager::class.java)
             val subIds: IntArray = if (subId == -1) {
@@ -71,7 +79,10 @@ class ImsResetter : Instrumentation() {
             result.putBoolean(BUNDLE_RESULT, false)
             result.putString(BUNDLE_RESULT_MSG, t.message ?: t.javaClass.simpleName)
         } finally {
-            am.stopDelegateShellPermissionIdentity()
+            if (delegated) {
+                runCatching { am.stopDelegateShellPermissionIdentity() }
+                    .onFailure { Log.w(TAG, "stop delegate shell identity failed", it) }
+            }
         }
 
         finish(Activity.RESULT_OK, result)

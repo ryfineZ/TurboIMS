@@ -35,6 +35,13 @@ class ShizukuProvider : ShizukuProvider() {
         private const val TAG = "ShizukuProvider"
         private const val INSTRUMENTATION_RESULT_TIMEOUT_MS = 15_000L
 
+        data class CaptivePortalConfig(
+            val httpUrl: String,
+            val httpsUrl: String,
+            val isCnUrl: Boolean,
+            val isOverridden: Boolean,
+        )
+
         suspend fun overrideImsConfig(context: Context, data: Bundle): String? {
             val primaryArgs = Bundle(data)
             val result = startInstrumentation(context, ImsModifier::class.java, primaryArgs, true)
@@ -67,6 +74,7 @@ class ShizukuProvider : ShizukuProvider() {
                     countryIso = it.countryIso ?: "",
                     mcc = it.mccString ?: "",
                     mnc = it.mncString ?: "",
+                    iccId = it.iccId ?: "",
                 )
             } ?: emptyList()
             return resultList
@@ -137,8 +145,42 @@ class ShizukuProvider : ShizukuProvider() {
             return overrideImsConfig(context, bundle)
         }
 
+        suspend fun queryCaptivePortalConfig(context: Context): CaptivePortalConfig? {
+            val args = Bundle().apply {
+                putString(CaptivePortalFixer.BUNDLE_ACTION, CaptivePortalFixer.actionQuery())
+            }
+            val result = startInstrumentation(context, CaptivePortalFixer::class.java, args, true)
+            if (result == null || !result.getBoolean(CaptivePortalFixer.BUNDLE_RESULT, false)) {
+                return null
+            }
+            return CaptivePortalConfig(
+                httpUrl = result.getString(CaptivePortalFixer.BUNDLE_HTTP_URL).orEmpty(),
+                httpsUrl = result.getString(CaptivePortalFixer.BUNDLE_HTTPS_URL).orEmpty(),
+                isCnUrl = result.getBoolean(CaptivePortalFixer.BUNDLE_IS_CN_URL, false),
+                isOverridden = result.getBoolean(CaptivePortalFixer.BUNDLE_IS_OVERRIDDEN, false)
+            )
+        }
+
         suspend fun applyCaptivePortalCnUrls(context: Context): String? {
-            val result = startInstrumentation(context, CaptivePortalFixer::class.java, null, true)
+            val args = Bundle().apply {
+                putString(CaptivePortalFixer.BUNDLE_ACTION, CaptivePortalFixer.actionApplyCn())
+            }
+            val result = startInstrumentation(context, CaptivePortalFixer::class.java, args, true)
+            if (result == null) {
+                return "failed with empty result"
+            }
+            return if (result.getBoolean(CaptivePortalFixer.BUNDLE_RESULT)) {
+                null
+            } else {
+                result.getString(CaptivePortalFixer.BUNDLE_RESULT_MSG) ?: "unknown error"
+            }
+        }
+
+        suspend fun restoreCaptivePortalDefaultUrls(context: Context): String? {
+            val args = Bundle().apply {
+                putString(CaptivePortalFixer.BUNDLE_ACTION, CaptivePortalFixer.actionRestoreDefault())
+            }
+            val result = startInstrumentation(context, CaptivePortalFixer::class.java, args, true)
             if (result == null) {
                 return "failed with empty result"
             }

@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Turbo IMS</string>
+    <string name="app_name">Carrier IMS</string>
     <string name="for_pixel">forked by Mystery0</string>
+    <string name="brand_name">Carrier IMS for Pixel</string>
+    <string name="brand_subtitle">基于 TurboIMS · 运营商与 IMS 工具集</string>
 
     <!-- Main Screen -->
     <string name="system_info">系统信息</string>
@@ -31,11 +33,11 @@
     <string name="ims_registration_status">IMS 注册状态</string>
     <string name="ims_registration_status_desc">IMS 未注册时，下方功能均无效</string>
     <string name="ims_registration_per_sim_desc">选择“所有SIM”时，IMS 注册按每张 SIM 独立执行，结果可能不同。</string>
-    <string name="all_sim_switch_only_desc">开关项切换后立即生效；文本项修改后请点击“应用”</string>
+    <string name="all_sim_switch_only_desc">所有开关实时生效</string>
     <string name="carrier_name">运营商名称</string>
     <string name="carrier_name_desc">用于修改系统显示的运营商名称标识（如状态栏运营商名）</string>
     <string name="country_iso">运营商国家码</string>
-    <string name="country_iso_desc">用于指定运营商国家/地区归属（ISO 国家码）</string>
+    <string name="country_iso_desc">支持快捷选择或手动输入 MCC/ISO；仅填 ISO 可单独覆盖 ISO</string>
     <string name="country_iso_option_default">系统默认（不覆盖）</string>
     <string name="country_iso_option_china_mainland">中国大陆</string>
     <string name="country_iso_option_hong_kong">中国香港</string>
@@ -45,13 +47,26 @@
     <string name="country_iso_option_uk">英国</string>
     <string name="country_iso_option_korea">韩国</string>
     <string name="country_iso_option_singapore">新加坡</string>
-    <string name="country_iso_option_other">其他</string>
+    <string name="country_iso_option_other">自定义(手动输入MCC+ISO)</string>
     <string name="country_iso_option_format_mcc_iso">%1$s MCC: %2$s (ISO: %3$s)</string>
     <string name="country_iso_option_format_iso">%1$s (ISO: %2$s)</string>
+    <string name="country_iso_current_format_iso_actual_mcc">%1$s (ISO: %2$s，实际MCC: %3$s)</string>
     <string name="country_iso_unknown">未知</string>
     <string name="country_iso_current_value">当前设置：%s</string>
-    <string name="country_iso_custom_label">手动输入 ISO（2位字母）</string>
-    <string name="country_iso_custom_placeholder">请输入两位国家码，例如 fr</string>
+    <string name="country_iso_not_overridden">未覆盖</string>
+    <string name="country_iso_current_format_mcc_only">MCC: %s</string>
+    <string name="country_iso_actual_mcc_note">当前网络 MCC: %1$s（仅覆盖 ISO，不修改 MCC）</string>
+    <string name="country_iso_actual_mcc_mnc_note">当前网络 MCC/MNC: %1$s/%2$s（仅覆盖 ISO，不修改 MCC）</string>
+    <string name="country_iso_mcc_label">MCC</string>
+    <string name="country_iso_mcc_placeholder">例如 460 / 310 / 310-316</string>
+    <string name="country_iso_mnc_label">MNC（只读）</string>
+    <string name="country_iso_mnc_placeholder">当前无可用 MNC</string>
+    <string name="country_iso_mnc_desc">当前 SIM 的 MNC，用于组成 MCCMNC 并匹配运营商配置</string>
+    <string name="country_iso_iso_label">ISO</string>
+    <string name="country_iso_quick_pick_label">国家快捷选择</string>
+    <string name="country_iso_quick_pick_placeholder">从常用国家快速选择，或选“其他”输入 MCC+ISO</string>
+    <string name="country_iso_custom_label">手动输入 ISO</string>
+    <string name="country_iso_custom_placeholder">例如 cn / us / 11111</string>
     <string name="ims_user_agent">IMS User Agent</string>
     <string name="ims_user_agent_desc">用于设置 IMS 注册上报标识，影响兼容性</string>
     <string name="issue_info_copied">系统信息已复制到剪贴板</string>
@@ -62,22 +77,32 @@
     <string name="action_issue">Issue</string>
     <string name="action_logcat">日志</string>
     <string name="action_update">更新</string>
-    <string name="captive_portal_fix_title">Wi-Fi 异常修复</string>
-    <string name="captive_portal_fix_action">一键修复 Wi-Fi 网络</string>
-    <string name="captive_portal_fix_running">正在修复 Wi-Fi 网络…</string>
-    <string name="captive_portal_fix_desc">用于修复国内 Wi-Fi 已连接但显示网络受限或感叹号、无法上网的问题</string>
+    <string name="captive_portal_fix_title">网络验证修复</string>
+    <string name="captive_portal_fix_action">一键修复网络</string>
+    <string name="captive_portal_fix_restore_action">一键恢复默认</string>
+    <string name="captive_portal_fix_normal_action">网络正常</string>
+    <string name="captive_portal_fix_running">正在修复网络…</string>
+    <string name="captive_portal_restore_running">正在恢复默认验证地址…</string>
+    <string name="captive_portal_fix_checking">检测中…</string>
+    <string name="captive_portal_fix_desc">用于修复国内网络已连接但显示网络受限或感叹号、无法上网的问题</string>
+    <string name="captive_portal_fix_status_checking">正在检查当前验证地址与网络连通性…</string>
+    <string name="captive_portal_fix_status_need_fix">检测到默认验证可能不可用，建议执行一键修复</string>
+    <string name="captive_portal_fix_status_restorable">当前已使用.cn验证地址，可按需恢复系统默认</string>
+    <string name="captive_portal_fix_status_normal">当前验证网络可用，无需修复</string>
     <string name="captive_portal_fix_requires_shizuku">需要先启动并授权 Shizuku 才能执行修复</string>
-    <string name="captive_portal_fix_success">Wi-Fi 网络修复完成；若仍有感叹号，请断开并重新连接 Wi-Fi。</string>
-    <string name="captive_portal_fix_failed">Wi-Fi 网络修复失败：%s</string>
-    <string name="donation_action">支持开发</string>
+    <string name="captive_portal_fix_success">网络修复完成；若状态未更新，请重新连接网络后再试。</string>
+    <string name="captive_portal_fix_failed">网络修复失败：%s</string>
+    <string name="captive_portal_restore_success">已恢复系统默认验证地址</string>
+    <string name="captive_portal_restore_failed">恢复默认失败：%s</string>
+    <string name="donation_action">支持作者</string>
     <string name="donation_support_desc">如果 Turbo IMS 对你有帮助，欢迎打赏支持持续维护。</string>
     <string name="donation_sheet_title">支持 Turbo IMS 持续更新</string>
     <string name="donation_sheet_desc">感谢你的支持，将用于机型适配、系统兼容与问题修复。</string>
     <string name="donation_wechat">微信赞赏</string>
     <string name="donation_alipay">支付宝</string>
-    <string name="donation_pay_now">立即支付</string>
+    <string name="donation_pay_now">请喝咖啡</string>
     <string name="donation_save_button">保存二维码</string>
-    <string name="donation_save_tip">“立即支付”会先保存到相册（DCIM/TurboIMS）再尝试拉起支付应用（页面取决于收款码类型）</string>
+    <string name="donation_save_tip">“请喝咖啡”会先保存到相册（DCIM/TurboIMS）再尝试拉起支付应用（页面取决于收款码类型）</string>
     <string name="donation_feedback_title">打赏功能提示</string>
     <string name="donation_save_success">二维码已保存到相册</string>
     <string name="donation_save_success_with_path">二维码已保存到相册：%s</string>
@@ -106,14 +131,19 @@
     <string name="_5g_plus_icon_desc">适配中国大陆5GA信号</string>
     <string name="show_4g_for_lte">显示 4G 图标</string>
     <string name="show_4g_for_lte_desc">LTE 网络显示为 4G 图标</string>
+    <string name="tiktok_network_fix">修复 TikTok 无网络</string>
+    <string name="tiktok_network_fix_desc">仅大陆SIM有此选项，海外SIM无需修复</string>
 
     <!-- Button -->
     <string name="apply_config">应用</string>
     <string name="apply_config_running">应用中…</string>
-    <string name="reset_config">重置</string>
+    <string name="reset_config">恢复运营商默认</string>
     <string name="reset_config_desc">重置会清除当前SIM的覆盖配置并恢复运营商默认配置</string>
     <string name="restart_ims">重启 IMS</string>
-    <string name="dump_config">导出</string>
+    <string name="dump_config">查看全部配置</string>
+    <string name="restore_confirm_title">确认恢复运营商默认</string>
+    <string name="restore_confirm_message">将清除当前 SIM 的覆盖配置，并恢复为系统当前运营商配置，是否继续？</string>
+    <string name="restore_confirm_action">恢复</string>
 
     <!-- Tips -->
     <string name="tip">提示：</string>

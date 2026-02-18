@@ -1,115 +1,120 @@
-# Turbo IMS
+# Carrier IMS for Pixel (TurboIMS)
 
-> TurboIMS 的改版分支，增加诊断与兼容能力，适配 Android 16 之后的限制。
->
-> 本项目 fork 自 [Turbo1123/TurboIMS](https://github.com/Turbo1123/TurboIMS)，并在此基础上持续维护与增强。
+<p align="center">
+  <img src="app/src/main/ic_launcher-playstore.png" width="128" alt="Carrier IMS logo" />
+</p>
 
-## 为什么要改
+<p align="center">
+  <strong>面向 Google Pixel 的运营商与 IMS 工具集</strong><br/>
+  在 Shizuku 权限下快速调优 VoLTE/VoWiFi/VoNR、5G 显示与网络兼容行为
+</p>
 
-Android 16（尤其 2026-01 安全补丁之后）对 `CarrierConfig` 的 **persistent 覆盖**做了更严格限制：
-- 非系统应用调用 `overrideConfig(..., persistent=true)` 可能直接触发 `com.android.phone` 崩溃
-- 即使 UI 显示 5G 图标，IMS 也可能不注册，数据无法上网
+<p align="center">
+  中文（默认） | <a href="README_EN.md">English</a>
+</p>
 
-因此本改版做了以下调整：
-1. **Broker 兜底写入**：默认使用非 persistent 写入，避免系统崩溃
-2. **读取真实系统配置**：UI 开关展示当前 CarrierConfig 实际值
-3. **一键重启 IMS**：便于配置快速生效
-4. **全量配置 Dump + 过滤**：快速诊断当前系统配置
-5. **QS 快捷图块**：VoLTE 开关 / IMS 状态快捷入口
-6. **SIM 读取增强**：加入 ISub 读取路径，兼容 eSIM/双卡
-7. **包名改为 `io.github.vvb2060.ims.mod`**：可与原版共存安装
+<p align="center">
+  <a href="https://github.com/ryfineZ/TurboIMS/releases"><img alt="Release" src="https://img.shields.io/github/v/release/ryfineZ/TurboIMS"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/ryfineZ/TurboIMS"></a>
+  <img alt="Platform" src="https://img.shields.io/badge/Platform-Android%2013%2B-3DDC84">
+  <img alt="Device" src="https://img.shields.io/badge/Device-Pixel%20Tensor-blue">
+  <img alt="Permission" src="https://img.shields.io/badge/Requires-Shizuku-orange">
+</p>
 
-## 功能概览
+## 项目定位
 
-- 系统信息、Shizuku 状态
-- SIM 选择（单卡/全卡）
-- IMS 功能开关：VoLTE / VoWiFi / VT / VoNR / UT / Cross‑SIM / 5G NR / 5G 阈值 / 显示 4G 等
-- **读取当前系统配置（同步按钮）**
-- **一键重启 IMS**
-- **Dump 当前 CarrierConfig（可过滤关键字）**
-- **QS 快捷图块**：VoLTE Toggle / IMS Status
+本项目是基于 [Mystery00/TurboIMS](https://github.com/Mystery00/TurboIMS) 的持续维护分支，面向中国大陆与跨区使用场景做了大量交互与兼容性增强。  
+目标是让普通用户也能更低门槛地完成 IMS 功能调优与问题排查。
 
-## 最新版本更新（3.8.3）
+## 界面预览
 
-- 新增「Wi-Fi 异常修复」独立卡片，提供小白可用的一键修复入口
-- 新增「一键修复 Wi-Fi 网络」能力：修复国内 Wi‑Fi 显示网络受限/感叹号且无法上网
-- 优化修复文案与交互反馈，降低技术门槛
-- 统一系统信息、Wi‑Fi 修复卡片与 SIM 区块间距，布局更一致
-- 发布说明与文档同步更新
+<p align="center">
+  <img src="docs/Screenshot1.png" width="46%" alt="screenshot-1" />
+  <img src="docs/Screenshot2.png" width="46%" alt="screenshot-2" />
+</p>
 
-完整变更请见 [CHANGELOG.md](CHANGELOG.md) 与 [Releases](https://github.com/ryfineZ/TurboIMS/releases)。
+## 功能矩阵
 
-## 系统要求
+| 模块 | 能力 | 说明 |
+|---|---|---|
+| 系统信息 | 版本/设备/补丁/Shizuku 状态 | 集中展示运行环境，便于排障 |
+| IMS 注册 | IMS 注册状态查询与手动注册 | 未注册时可一键触发注册流程 |
+| 运营商能力 | VoLTE / VoWiFi / VT / VoNR / UT / Cross‑SIM | 开关项实时生效，失败自动回滚并记录日志 |
+| 5G 能力 | 5G NR / 5G 信号强度 / 5G+ 图标 | 适配中国大陆常见展示需求 |
+| 网络修复 | 一键修复网络验证（captive portal） | 修复“已连接但网络受限/感叹号” |
+| TikTok 修复 | 修复 TikTok 无网络（大陆 SIM） | 仅大陆 SIM 提供该选项，海外 SIM 默认无需修复 |
+| 诊断工具 | 日志查看、配置全量查看、Issue 快捷上报 | 失败日志可直接附带到 Issue |
+| 应用维护 | 应用内检查更新与下载安装 | 直接对接仓库 Release |
 
-- Pixel Tensor 机型（Pixel 6/7/8/9/10 系列、Fold/Tablet）
-- Android 13+（建议 14/15/16）
-- Shizuku 运行并授权
+## 为什么这个分支更适合日常使用
 
-## 构建与安装
+- 更清晰的 UI 结构：核心操作入口前置，文案更贴近实际问题
+- 更稳的写入策略：优先安全路径，失败可回退，避免高风险操作
+- 更完整的排障链路：失败日志沉淀、系统信息复制、Issue 一步提交
+- 更贴近国内网络环境：5G 显示与联网验证修复能力内置
 
-```
+## 快速开始
+
+1. 从 [Releases](https://github.com/ryfineZ/TurboIMS/releases) 下载并安装 APK  
+2. 安装并启动 [Shizuku](https://shizuku.rikka.app/zh-hans/)  
+3. 打开 App，授权 Shizuku  
+4. 选择 SIM，按需开启功能开关  
+
+## 适用范围
+
+- 设备：Pixel Tensor 平台（Pixel 6/7/8/9/10、Fold、Tablet）
+- 系统：Android 13 及以上（建议 Android 14/15/16）
+- 语言：简体中文 / English
+
+## 构建（开发者）
+
+```bash
 ./gradlew :app:assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-> 注意：Debug 构建需要签名。项目已通过 `local.properties` 指定 keystore。若报签名错误，请创建本地 keystore 并写入：
+如需本地签名，请在 `local.properties` 中配置：
 
-```
+```properties
 SIGN_KEY_STORE_FILE=/path/to/your.keystore
 SIGN_KEY_STORE_PASSWORD=***
 SIGN_KEY_ALIAS=***
 SIGN_KEY_PASSWORD=***
 ```
 
-## 使用步骤（建议顺序）
-
-1. 确认 Shizuku 运行并授权
-2. 选择 SIM 卡
-3. 点击“同步”读取当前配置
-4. 按需开启/关闭功能并“应用”
-5. 如需立即生效，可点击“重启 IMS”
-6. 排障时进入“Dump 配置”并使用过滤
-
 ## 常见问题
 
-### 1. 有信号但无法上网
-系统更新后可能清空 APN。请先检查 APN 是否为空：
-- 设置 → 网络与互联网 → SIM → APN
-- MCC/MNC 一般由系统自动填写，无需手动修改
-- 中国移动（China Mobile）
-  - 名称（Name）：`CMNET`（名称可自定义，建议用此便于识别）
-  - APN：`cmnet`
-  - MCC/MNC：系统自动读取，保持默认（MNC 可能为 00/02/07）
-  - APN 类型（APN Type）：`default,supl`（如无法上网可尝试 `default,supl,net`）
-  - APN 协议（APN Protocol）：`IPv4/IPv6`
-- 中国联通（China Unicom）
-  - 名称（Name）：`3GNET`
-  - APN：`3gnet`
-  - MCC/MNC：系统自动读取，保持默认（MNC 可能为 01/06）
-  - APN 类型（APN Type）：`default,supl`
-  - APN 协议（APN Protocol）：`IPv4/IPv6`
-- 中国电信（China Telecom）
-  - 名称（Name）：`CTNET`
-  - APN：`ctnet`（注意小写）
-  - MCC/MNC：系统自动读取，保持默认（MNC 可能为 03/11）
-  - APN 类型（APN Type）：`default,supl`
-  - APN 协议（APN Protocol）：`IPv4/IPv6`
-  - 漫游协议（Roaming Protocol）：`IPv4`
+### 1. IMS 仍未注册
 
-### 2. 5G 图标有但数据不通
-Android 16 之后 CarrierConfig 覆盖可能无法真正让 IMS 注册成功。建议：
-- 查看 `*#*#4636#*#*` 的 IMS Registration 状态
-- 若为 Not registered，则需要运营商支持或更高权限（system app/root）
+- 先确认 Shizuku 已就绪  
+- 检查 VoLTE / VoWiFi 是否可用  
+- 使用日志与 Issue 上报能力收集现场信息
 
-## 免责声明
+### 2. 网络有信号但无法上网
 
-本应用会修改系统运营商配置，仅供学习/测试使用。请自行承担风险。
+- 先检查 APN 是否缺失或异常  
+- 再尝试“网络验证修复”功能  
+
+### 3. TikTok 仍不可用
+
+- 仅大陆 SIM 才会出现“修复 TikTok 无网络”开关  
+- 变更后建议重启目标 App 或清理其会话缓存再测试
+
+## 更新记录
+
+- 详细版本变更见 [CHANGELOG.md](CHANGELOG.md)
+- 历史发布见 [Releases](https://github.com/ryfineZ/TurboIMS/releases)
 
 ## 致谢
 
-- vvb2060/Ims
-- kyujin-cho/pixel-volte-patch
-- nullbytepl/CarrierVanityName
+- [Mystery00/TurboIMS](https://github.com/Mystery00/TurboIMS)
+- [vvb2060/Ims](https://github.com/vvb2060/Ims)
+- [kyujin-cho/pixel-volte-patch](https://github.com/kyujin-cho/pixel-volte-patch)
+- [nullbytepl/CarrierVanityName](https://github.com/nullbytepl/CarrierVanityName)
+
+## 免责声明
+
+本应用会修改系统运营商相关配置，仅用于学习、测试与自有设备调优。请自行评估风险并对操作结果负责。
 
 ## License
 

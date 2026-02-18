@@ -36,7 +36,7 @@
     <string name="shizuku_no_permission_msg">Berikan izin Shizuku</string>
     <string name="select_single_sim">Pilih satu SIM saja</string>
     <string name="sim_list_refresh">Daftar SIM diperbarui</string>
-    <string name="app_name">Turbo IMS</string>
+    <string name="app_name">Carrier IMS</string>
     <string name="for_pixel">forked by Mystery0</string>
     <string name="system_build_version">System Build Version: %s</string>
     <string name="features_config">Features for this apply</string>

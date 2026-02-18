@@ -28,6 +28,10 @@ class SimReader : Instrumentation() {
     @SuppressLint("MissingPermission")
     override fun start() {
         super.start()
+        if (!waitForShizukuBinderReady()) {
+            finish(Activity.RESULT_CANCELED, Bundle())
+            return
+        }
         val binder = ServiceManager.getService(Context.ACTIVITY_SERVICE)
         val am = IActivityManager.Stub.asInterface(ShizukuBinderWrapper(binder))
         var delegated = false

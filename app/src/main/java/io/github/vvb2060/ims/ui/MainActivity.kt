@@ -20,9 +20,11 @@ import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.clickable
@@ -34,6 +36,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.rememberScrollState
@@ -44,14 +47,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Cached
-import androidx.compose.material.icons.rounded.SettingsBackupRestore
-import androidx.compose.material.icons.rounded.Sync
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
-import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -59,6 +61,7 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -67,8 +70,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -83,15 +84,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -144,11 +144,6 @@ private data class UpdateDialogState(
     val latest: ReleaseInfo,
 )
 
-private data class ApplyResultDialogState(
-    val success: Boolean,
-    val message: String,
-)
-
 private data class SavedDonationQr(
     val uri: Uri,
     val path: String,
@@ -161,8 +156,13 @@ private data class CountryIsoOption(
     val labelRes: Int,
 )
 
+private enum class CaptivePortalAction {
+    FIX,
+    RESTORE,
+    NONE,
+}
+
 private val countryIsoOptions = listOf(
-    CountryIsoOption(COUNTRY_ISO_OPTION_DEFAULT, null, null, R.string.country_iso_option_default),
     CountryIsoOption("cn", "cn", "460", R.string.country_iso_option_china_mainland),
     CountryIsoOption("hk", "hk", "454", R.string.country_iso_option_hong_kong),
     CountryIsoOption("tw", "tw", "466", R.string.country_iso_option_taiwan),
@@ -192,6 +192,14 @@ private fun switchFeatureCategoryOrder(feature: Feature): Int {
         fourGFeatureSet.contains(feature) -> 1
         else -> 2
     }
+}
+
+private fun isChinaDomesticSim(sim: SimSelection?): Boolean {
+    if (sim == null || sim.subId < 0) return false
+    val iccId = sim.iccId.trim()
+    if (iccId.startsWith("8986")) return true
+    val mcc = sim.mcc.filter { it.isDigit() }.take(3)
+    return mcc == "460"
 }
 
 private fun defaultFeatureValue(feature: Feature): FeatureValue {
@@ -267,9 +275,6 @@ class MainActivity : BaseActivity() {
     override fun Content() {
         val context = LocalContext.current
 
-        val scrollBehavior =
-            TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
-
         val systemInfo by viewModel.systemInfo.collectAsStateWithLifecycle()
         val shizukuStatus by viewModel.shizukuStatus.collectAsStateWithLifecycle()
         val allSimList by viewModel.allSimList.collectAsStateWithLifecycle()
@@ -286,12 +291,16 @@ class MainActivity : BaseActivity() {
         var applyingConfiguration by remember { mutableStateOf(false) }
         var checkingUpdate by remember { mutableStateOf(false) }
         var fixingCaptivePortal by remember { mutableStateOf(false) }
+        var checkingCaptivePortalStatus by remember { mutableStateOf(false) }
+        var captivePortalFixState by remember { mutableStateOf<MainViewModel.CaptivePortalFixState?>(null) }
         var updateDialogState by remember { mutableStateOf<UpdateDialogState?>(null) }
-        var applyResultDialogState by remember { mutableStateOf<ApplyResultDialogState?>(null) }
         var showDonationSheet by remember { mutableStateOf(false) }
         var donationFeedbackMessage by remember { mutableStateOf<String?>(null) }
         val featureSwitches = remember { mutableStateMapOf<Feature, FeatureValue>() }
         val committedFeatureSwitches = remember { mutableStateMapOf<Feature, FeatureValue>() }
+        val countryMccDraftBySubId = remember { mutableStateMapOf<Int, String>() }
+        val committedCountryMccBySubId = remember { mutableStateMapOf<Int, String>() }
+        val countryIsoApplySignalBySubId = remember { mutableStateMapOf<Int, Int>() }
         val submitIssueAction: () -> Unit = {
             val issueBody = buildIssueBody(
                 context = context,
@@ -314,6 +323,14 @@ class MainActivity : BaseActivity() {
                 showShizukuUpdateDialog = true
             }
             pendingAutoSelectSimAfterReady = shizukuStatus == ShizukuStatus.READY
+            if (shizukuStatus == ShizukuStatus.READY) {
+                checkingCaptivePortalStatus = true
+                captivePortalFixState = viewModel.queryCaptivePortalFixState()
+                checkingCaptivePortalStatus = false
+            } else {
+                checkingCaptivePortalStatus = false
+                captivePortalFixState = null
+            }
         }
         LaunchedEffect(allSimList) {
             val validSubIds = allSimList.filter { it.subId >= 0 }.map { it.subId }.toSet()
@@ -323,6 +340,15 @@ class MainActivity : BaseActivity() {
             imsRegistrationLoadingMap.keys.toList()
                 .filterNot { validSubIds.contains(it) }
                 .forEach { imsRegistrationLoadingMap.remove(it) }
+            countryMccDraftBySubId.keys.toList()
+                .filterNot { validSubIds.contains(it) }
+                .forEach { countryMccDraftBySubId.remove(it) }
+            committedCountryMccBySubId.keys.toList()
+                .filterNot { validSubIds.contains(it) }
+                .forEach { committedCountryMccBySubId.remove(it) }
+            countryIsoApplySignalBySubId.keys.toList()
+                .filterNot { validSubIds.contains(it) }
+                .forEach { countryIsoApplySignalBySubId.remove(it) }
             val currentSelected = selectedSim
             if (currentSelected == null) {
                 selectedSim = allSimList.firstOrNull()
@@ -344,75 +370,58 @@ class MainActivity : BaseActivity() {
             pendingAutoSelectSimAfterReady = false
         }
         LaunchedEffect(selectedSim, shizukuStatus, allSimList) {
-            if (selectedSim != null) {
-                committedFeatureSwitches.clear()
-                val currentConfig = if (shizukuStatus == ShizukuStatus.READY && selectedSim!!.subId >= 0) {
-                    viewModel.loadCurrentConfiguration(selectedSim!!.subId)
+            val currentSelected = selectedSim ?: return@LaunchedEffect
+            committedFeatureSwitches.clear()
+            val currentConfig = if (shizukuStatus == ShizukuStatus.READY && currentSelected.subId >= 0) {
+                viewModel.loadCurrentConfiguration(currentSelected.subId)
+            } else {
+                null
+            }
+            if (currentConfig != null) {
+                committedFeatureSwitches.putAll(currentConfig)
+            } else {
+                val savedConfig = viewModel.loadConfiguration(currentSelected.subId)
+                if (savedConfig != null) {
+                    committedFeatureSwitches.putAll(savedConfig)
                 } else {
-                    null
+                    committedFeatureSwitches.putAll(viewModel.loadDefaultPreferences())
                 }
-                if (currentConfig != null) {
-                    committedFeatureSwitches.putAll(currentConfig)
-                } else {
-                    val savedConfig = viewModel.loadConfiguration(selectedSim!!.subId)
-                    if (savedConfig != null) {
-                        committedFeatureSwitches.putAll(savedConfig)
+            }
+            syncFeatureState(featureSwitches, committedFeatureSwitches)
+            if (currentSelected.subId >= 0) {
+                val savedMcc = viewModel.loadSavedCountryMccOverride(currentSelected.subId)
+                countryMccDraftBySubId[currentSelected.subId] = savedMcc
+                committedCountryMccBySubId[currentSelected.subId] = savedMcc
+            }
+            if (currentSelected.subId >= 0) {
+                imsRegistrationStatusMap[currentSelected.subId] =
+                    if (shizukuStatus == ShizukuStatus.READY) {
+                        viewModel.readImsRegistrationStatus(currentSelected.subId)
                     } else {
-                        committedFeatureSwitches.putAll(viewModel.loadDefaultPreferences())
+                        null
                     }
-                }
-                syncFeatureState(featureSwitches, committedFeatureSwitches)
-                if (selectedSim!!.subId >= 0) {
-                    imsRegistrationStatusMap[selectedSim!!.subId] =
+            } else {
+                allSimList.filter { it.subId >= 0 }.forEach { sim ->
+                    imsRegistrationStatusMap[sim.subId] =
                         if (shizukuStatus == ShizukuStatus.READY) {
-                            viewModel.readImsRegistrationStatus(selectedSim!!.subId)
+                            viewModel.readImsRegistrationStatus(sim.subId)
                         } else {
                             null
                         }
-                } else {
-                    allSimList.filter { it.subId >= 0 }.forEach { sim ->
-                        imsRegistrationStatusMap[sim.subId] =
-                            if (shizukuStatus == ShizukuStatus.READY) {
-                                viewModel.readImsRegistrationStatus(sim.subId)
-                            } else {
-                                null
-                            }
-                    }
                 }
             }
         }
 
         Scaffold(
             modifier = Modifier
-                .fillMaxSize()
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
+                .fillMaxSize(),
             contentWindowInsets = WindowInsets(0.dp),
-            topBar = {
-                CenterAlignedTopAppBar(
-                    title = {
-                        Row(
-                            verticalAlignment = Alignment.Bottom,
-                        ) {
-                            Text(
-                                stringResource(id = R.string.app_name),
-                                fontSize = 28.sp,
-                                fontWeight = FontWeight.Bold,
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                stringResource(id = R.string.for_pixel),
-                                fontSize = 14.sp,
-                                fontFamily = FontFamily.Monospace
-                            )
-                        }
-                    },
-                    scrollBehavior = scrollBehavior,
-                )
-            }) { innerPadding ->
+        ) { innerPadding ->
             Column(
                 modifier = Modifier
                     .padding(innerPadding)
                     .consumeWindowInsets(innerPadding)
+                    .statusBarsPadding()
                     .verticalScroll(rememberScrollState())
             ) {
                 SystemInfoCard(
@@ -482,7 +491,9 @@ class MainActivity : BaseActivity() {
                 )
                 CaptivePortalFixCard(
                     shizukuStatus = shizukuStatus,
+                    checkingCaptivePortalStatus = checkingCaptivePortalStatus,
                     fixingCaptivePortal = fixingCaptivePortal,
+                    state = captivePortalFixState,
                     onFixCaptivePortal = {
                         if (fixingCaptivePortal) return@CaptivePortalFixCard
                         if (shizukuStatus != ShizukuStatus.READY) {
@@ -490,22 +501,46 @@ class MainActivity : BaseActivity() {
                             return@CaptivePortalFixCard
                         }
                         scope.launch {
+                            val action = when (captivePortalFixState?.mode) {
+                                MainViewModel.CaptivePortalFixMode.CAN_RESTORE -> CaptivePortalAction.RESTORE
+                                MainViewModel.CaptivePortalFixMode.NORMAL -> CaptivePortalAction.NONE
+                                else -> CaptivePortalAction.FIX
+                            }
+                            if (action == CaptivePortalAction.NONE) return@launch
                             fixingCaptivePortal = true
-                            val resultMsg = viewModel.applyCaptivePortalCnUrls()
+                            val resultMsg = when (action) {
+                                CaptivePortalAction.FIX -> viewModel.applyCaptivePortalCnUrls()
+                                CaptivePortalAction.RESTORE -> viewModel.restoreCaptivePortalDefaultUrls()
+                                CaptivePortalAction.NONE -> null
+                            }
                             fixingCaptivePortal = false
                             if (resultMsg == null) {
                                 Toast.makeText(
                                     context,
-                                    R.string.captive_portal_fix_success,
+                                    if (action == CaptivePortalAction.RESTORE) {
+                                        R.string.captive_portal_restore_success
+                                    } else {
+                                        R.string.captive_portal_fix_success
+                                    },
                                     Toast.LENGTH_LONG
                                 ).show()
                             } else {
                                 Toast.makeText(
                                     context,
-                                    context.getString(R.string.captive_portal_fix_failed, resultMsg),
+                                    context.getString(
+                                        if (action == CaptivePortalAction.RESTORE) {
+                                            R.string.captive_portal_restore_failed
+                                        } else {
+                                            R.string.captive_portal_fix_failed
+                                        },
+                                        resultMsg
+                                    ),
                                     Toast.LENGTH_LONG
                                 ).show()
                             }
+                            checkingCaptivePortalStatus = true
+                            captivePortalFixState = viewModel.queryCaptivePortalFixState()
+                            checkingCaptivePortalStatus = false
                         }
                     }
                 )
@@ -604,6 +639,19 @@ class MainActivity : BaseActivity() {
                             }
                         },
                         featureSwitches,
+                        countryIsoApplySignal = selectedSim?.subId
+                            ?.takeIf { it >= 0 }
+                            ?.let { countryIsoApplySignalBySubId[it] ?: 0 }
+                            ?: 0,
+                        countryMccDraft = selectedSim?.subId
+                            ?.takeIf { it >= 0 }
+                            ?.let { countryMccDraftBySubId[it].orEmpty() }
+                            .orEmpty(),
+                        onCountryMccDraftChange = { newMcc ->
+                            selectedSim?.subId
+                                ?.takeIf { it >= 0 }
+                                ?.let { countryMccDraftBySubId[it] = newMcc }
+                        },
                         onFeatureSwitchChange = { feature, value ->
                             when (feature.valueType) {
                                 FeatureValueType.STRING -> {
@@ -664,29 +712,38 @@ class MainActivity : BaseActivity() {
                                 }
                             }
                         },
-                        loadCurrentConfig = {
+                        onTextFeatureCommit = { _ ->
                             scope.launch {
                                 if (applyingConfiguration) return@launch
-                                if (selectedSim == null) return@launch
+                                val sim = selectedSim
+                                if (sim == null || sim.subId < 0) {
+                                    Toast.makeText(context, R.string.select_single_sim, Toast.LENGTH_SHORT).show()
+                                    return@launch
+                                }
                                 if (shizukuStatus != ShizukuStatus.READY) {
                                     Toast.makeText(context, R.string.shizuku_not_running_msg, Toast.LENGTH_LONG).show()
                                     return@launch
                                 }
-                                if (selectedSim!!.subId < 0) {
-                                    Toast.makeText(context, R.string.select_single_sim, Toast.LENGTH_SHORT).show()
+                                val mapToApply = buildCompleteFeatureMap(featureSwitches)
+                                if (mapToApply == buildCompleteFeatureMap(committedFeatureSwitches)) {
                                     return@launch
                                 }
                                 applyingConfiguration = true
                                 try {
-                                    val currentConfig = viewModel.loadCurrentConfiguration(selectedSim!!.subId)
-                                    if (currentConfig != null) {
-                                        syncFeatureState(committedFeatureSwitches, currentConfig)
-                                        syncFeatureState(featureSwitches, committedFeatureSwitches)
-                                        Toast.makeText(context, R.string.load_config_current_success, Toast.LENGTH_SHORT).show()
+                                    val resultMsg = viewModel.onApplyConfiguration(
+                                        sim,
+                                        mapToApply
+                                    )
+                                    if (resultMsg == null) {
+                                        syncFeatureState(committedFeatureSwitches, mapToApply)
+                                        countryIsoApplySignalBySubId[sim.subId] =
+                                            (countryIsoApplySignalBySubId[sim.subId] ?: 0) + 1
                                     } else {
-                                        syncFeatureState(committedFeatureSwitches, viewModel.loadDefaultPreferences())
-                                        syncFeatureState(featureSwitches, committedFeatureSwitches)
-                                        Toast.makeText(context, R.string.load_config_default_success, Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(
+                                            context,
+                                            context.getString(R.string.config_failed, resultMsg),
+                                            Toast.LENGTH_LONG
+                                        ).show()
                                     }
                                 } finally {
                                     applyingConfiguration = false
@@ -715,69 +772,41 @@ class MainActivity : BaseActivity() {
                                     if (currentConfig != null) {
                                         syncFeatureState(committedFeatureSwitches, currentConfig)
                                         syncFeatureState(featureSwitches, committedFeatureSwitches)
+                                        countryMccDraftBySubId[sim.subId] = viewModel
+                                            .loadSavedCountryMccOverride(sim.subId)
+                                        committedCountryMccBySubId[sim.subId] =
+                                            countryMccDraftBySubId[sim.subId].orEmpty()
+                                        countryIsoApplySignalBySubId[sim.subId] =
+                                            (countryIsoApplySignalBySubId[sim.subId] ?: 0) + 1
                                         imsRegistrationStatusMap[sim.subId] =
                                             viewModel.readImsRegistrationStatus(sim.subId)
                                     } else {
                                         syncFeatureState(committedFeatureSwitches, viewModel.loadDefaultPreferences())
                                         syncFeatureState(featureSwitches, committedFeatureSwitches)
+                                        countryMccDraftBySubId[sim.subId] = ""
+                                        committedCountryMccBySubId[sim.subId] = ""
+                                        countryIsoApplySignalBySubId[sim.subId] =
+                                            (countryIsoApplySignalBySubId[sim.subId] ?: 0) + 1
                                     }
                                 } finally {
                                     applyingConfiguration = false
                                 }
                             }
+                        },
+                        onDumpConfig = {
+                            val sim = selectedSim
+                            if (sim == null || sim.subId < 0) {
+                                Toast.makeText(context, R.string.select_single_sim, Toast.LENGTH_SHORT).show()
+                                return@FeaturesCard
+                            }
+                            startActivity(
+                                Intent(
+                                    this@MainActivity,
+                                    DumpActivity::class.java
+                                ).putExtra(DumpActivity.EXTRA_SUB_ID, sim.subId)
+                            )
                         }
                     )
-                    if (selectedSim?.subId != -1) {
-                        MainActionButtons(
-                            onApplyConfiguration = {
-                                val sim = selectedSim
-                                if (sim == null) {
-                                    Toast.makeText(context, R.string.select_single_sim, Toast.LENGTH_SHORT).show()
-                                    return@MainActionButtons
-                                }
-                                if (shizukuStatus != ShizukuStatus.READY) {
-                                    Toast.makeText(context, R.string.shizuku_not_running_msg, Toast.LENGTH_LONG).show()
-                                    return@MainActionButtons
-                                }
-                                if (applyingConfiguration) {
-                                    return@MainActionButtons
-                                }
-                                scope.launch {
-                                    applyingConfiguration = true
-                                    Toast.makeText(context, R.string.config_apply_in_progress, Toast.LENGTH_SHORT).show()
-                                    val mapToApply = buildCompleteFeatureMap(featureSwitches)
-                                    val resultMsg = viewModel.onApplyConfiguration(sim, mapToApply)
-                                    applyingConfiguration = false
-                                    applyResultDialogState = if (resultMsg == null) {
-                                        syncFeatureState(committedFeatureSwitches, mapToApply)
-                                        ApplyResultDialogState(
-                                            success = true,
-                                            message = context.getString(R.string.config_apply_success_message)
-                                        )
-                                    } else {
-                                        ApplyResultDialogState(
-                                            success = false,
-                                            message = context.getString(R.string.config_failed, resultMsg)
-                                        )
-                                    }
-                                }
-                            },
-                            onDumpConfig = {
-                                val sim = selectedSim
-                                if (sim == null || sim.subId < 0) {
-                                    Toast.makeText(context, R.string.select_single_sim, Toast.LENGTH_SHORT).show()
-                                    return@MainActionButtons
-                                }
-                                startActivity(
-                                    Intent(
-                                        this@MainActivity,
-                                        DumpActivity::class.java
-                                    ).putExtra(DumpActivity.EXTRA_SUB_ID, sim.subId)
-                                )
-                            },
-                            applyingConfiguration = applyingConfiguration
-                        )
-                    }
                 }
                 if (issueFailureLogs.isNotBlank()) {
                     IssueReportHintCard(
@@ -822,45 +851,6 @@ class MainActivity : BaseActivity() {
                                 Text(stringResource(id = android.R.string.cancel))
                             }
                         }
-                    )
-                }
-                if (applyResultDialogState != null) {
-                    val state = applyResultDialogState!!
-                    AlertDialog(
-                        onDismissRequest = { applyResultDialogState = null },
-                        title = {
-                            Text(
-                                text = stringResource(
-                                    if (state.success) {
-                                        R.string.config_apply_success_title
-                                    } else {
-                                        R.string.config_apply_failed_title
-                                    }
-                                )
-                            )
-                        },
-                        text = {
-                            Text(text = state.message)
-                        },
-                        confirmButton = {
-                            TextButton(onClick = { applyResultDialogState = null }) {
-                                Text(stringResource(id = android.R.string.ok))
-                            }
-                        },
-                        dismissButton = if (state.success) {
-                            {
-                                TextButton(
-                                    onClick = {
-                                        applyResultDialogState = null
-                                        showDonationSheet = true
-                                    }
-                                ) {
-                                    Text(stringResource(R.string.donation_action))
-                                }
-                            }
-                        } else {
-                            null
-                        },
                     )
                 }
                 if (showDonationSheet) {
@@ -952,7 +942,7 @@ class MainActivity : BaseActivity() {
         }
         val fileName = buildUpdateApkFileName(release.version)
         val request = DownloadManager.Request(release.downloadUrl.toUri())
-            .setTitle("Turbo IMS ${release.version}")
+            .setTitle("Carrier IMS ${release.version}")
             .setDescription(release.releaseNotes.ifBlank { release.version })
             .setMimeType(UPDATE_APK_MIME_TYPE)
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
@@ -1122,9 +1112,9 @@ fun SystemInfoCard(
         else -> ""
     }
     val shizukuStatusColor = when (shizukuStatus) {
-        ShizukuStatus.NOT_RUNNING -> Color.Red
-        ShizukuStatus.NO_PERMISSION -> Color(0xFFFF9800)
-        else -> Color(0xFF4CAF50)
+        ShizukuStatus.NOT_RUNNING -> MaterialTheme.colorScheme.error
+        ShizukuStatus.NO_PERMISSION -> MaterialTheme.colorScheme.tertiary
+        else -> Color(0xFF16A34A)
     }
 
     Card(
@@ -1133,6 +1123,8 @@ fun SystemInfoCard(
             .padding(16.dp),
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
+            BrandHeader()
+            Spacer(modifier = Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     stringResource(id = R.string.system_info),
@@ -1240,9 +1232,42 @@ fun SystemInfoCard(
 }
 
 @Composable
+private fun BrandHeader() {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Image(
+            painter = painterResource(id = R.drawable.ic_launcher_foreground),
+            contentDescription = null,
+            modifier = Modifier.size(36.dp),
+            contentScale = ContentScale.Fit
+        )
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.brand_name),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = stringResource(R.string.brand_subtitle),
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.outline
+            )
+        }
+    }
+}
+
+@Composable
 fun CaptivePortalFixCard(
     shizukuStatus: ShizukuStatus,
+    checkingCaptivePortalStatus: Boolean,
     fixingCaptivePortal: Boolean,
+    state: MainViewModel.CaptivePortalFixState?,
     onFixCaptivePortal: () -> Unit,
 ) {
     Card(
@@ -1266,21 +1291,45 @@ fun CaptivePortalFixCard(
             )
             Spacer(modifier = Modifier.height(10.dp))
             val isReady = shizukuStatus == ShizukuStatus.READY
+            val currentMode = state?.mode ?: MainViewModel.CaptivePortalFixMode.NEED_FIX
+            val buttonEnabled = isReady &&
+                !fixingCaptivePortal &&
+                !checkingCaptivePortalStatus &&
+                currentMode != MainViewModel.CaptivePortalFixMode.NORMAL
+            val statusTextRes = when {
+                checkingCaptivePortalStatus -> R.string.captive_portal_fix_status_checking
+                currentMode == MainViewModel.CaptivePortalFixMode.CAN_RESTORE -> R.string.captive_portal_fix_status_restorable
+                currentMode == MainViewModel.CaptivePortalFixMode.NORMAL -> R.string.captive_portal_fix_status_normal
+                else -> R.string.captive_portal_fix_status_need_fix
+            }
+            val actionTextRes = when {
+                fixingCaptivePortal && currentMode == MainViewModel.CaptivePortalFixMode.CAN_RESTORE ->
+                    R.string.captive_portal_restore_running
+                fixingCaptivePortal -> R.string.captive_portal_fix_running
+                checkingCaptivePortalStatus -> R.string.captive_portal_fix_checking
+                currentMode == MainViewModel.CaptivePortalFixMode.CAN_RESTORE ->
+                    R.string.captive_portal_fix_restore_action
+                currentMode == MainViewModel.CaptivePortalFixMode.NORMAL ->
+                    R.string.captive_portal_fix_normal_action
+                else -> R.string.captive_portal_fix_action
+            }
             Button(
                 onClick = onFixCaptivePortal,
-                enabled = isReady && !fixingCaptivePortal,
+                enabled = buttonEnabled,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(44.dp)
             ) {
                 Text(
-                    text = if (fixingCaptivePortal) {
-                        stringResource(R.string.captive_portal_fix_running)
-                    } else {
-                        stringResource(R.string.captive_portal_fix_action)
-                    }
+                    text = stringResource(actionTextRes)
                 )
             }
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = stringResource(statusTextRes),
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.outline
+            )
             if (!isReady) {
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
@@ -1396,9 +1445,13 @@ fun FeaturesCard(
     featureSwitchesEnabled: Boolean = true,
     onImsRegistrationToggle: (Int, Boolean) -> Unit,
     featureSwitches: Map<Feature, FeatureValue>,
+    countryIsoApplySignal: Int,
+    countryMccDraft: String,
+    onCountryMccDraftChange: (String) -> Unit,
     onFeatureSwitchChange: (Feature, FeatureValue) -> Unit,
-    loadCurrentConfig: () -> Unit,
+    onTextFeatureCommit: (Feature) -> Unit,
     resetFeatures: () -> Unit,
+    onDumpConfig: () -> Unit,
 ) {
     Card(
         modifier = Modifier
@@ -1406,47 +1459,82 @@ fun FeaturesCard(
             .padding(16.dp),
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            if (!isSelectAllSim) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Button(
-                        onClick = loadCurrentConfig,
-                        enabled = featureSwitchesEnabled,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                    ) {
-                        Icon(Icons.Rounded.Sync, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(stringResource(R.string.action_sync_short), fontSize = 15.sp)
-                    }
-                    Button(
-                        onClick = resetFeatures,
-                        enabled = featureSwitchesEnabled,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
-                    ) {
-                        Icon(Icons.Rounded.SettingsBackupRestore, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(stringResource(R.string.reset_config), fontSize = 15.sp)
+            var featureMenuExpanded by remember(isSelectAllSim, selectedSim?.subId) { mutableStateOf(false) }
+            var showRestoreConfirmDialog by remember(isSelectAllSim, selectedSim?.subId) {
+                mutableStateOf(false)
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = stringResource(R.string.features_config),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                if (!isSelectAllSim) {
+                    Box {
+                        IconButton(
+                            onClick = { featureMenuExpanded = true },
+                            enabled = featureSwitchesEnabled,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.MoreVert,
+                                contentDescription = stringResource(R.string.tools)
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = featureMenuExpanded,
+                            onDismissRequest = { featureMenuExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.reset_config)) },
+                                onClick = {
+                                    featureMenuExpanded = false
+                                    showRestoreConfirmDialog = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.dump_config)) },
+                                onClick = {
+                                    featureMenuExpanded = false
+                                    onDumpConfig()
+                                }
+                            )
+                        }
                     }
                 }
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = stringResource(R.string.reset_config_desc),
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.outline
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            if (showRestoreConfirmDialog) {
+                AlertDialog(
+                    onDismissRequest = { showRestoreConfirmDialog = false },
+                    title = { Text(stringResource(R.string.restore_confirm_title)) },
+                    text = { Text(stringResource(R.string.restore_confirm_message)) },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                showRestoreConfirmDialog = false
+                                resetFeatures()
+                            }
+                        ) {
+                            Text(stringResource(R.string.restore_confirm_action))
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showRestoreConfirmDialog = false }) {
+                            Text(stringResource(id = android.R.string.cancel))
+                        }
+                    }
                 )
-                Spacer(modifier = Modifier.height(8.dp))
             }
 
-            val showFeatures = Feature.entries.toMutableList()
-            if (isSelectAllSim) {
-                showFeatures.removeAll { it.valueType == FeatureValueType.STRING }
+            val showFeatures = Feature.entries.toMutableList().apply {
+                removeAll { it.valueType == FeatureValueType.STRING }
+                if (isSelectAllSim || !isChinaDomesticSim(selectedSim)) {
+                    remove(Feature.TIKTOK_NETWORK_FIX)
+                }
             }
             val orderedFeatures = showFeatures.sortedWith(
                 compareBy<Feature>(
@@ -1509,13 +1597,20 @@ fun FeaturesCard(
                                 title = title,
                                 description = description,
                                 initInput = inputValue,
-                                selectedSim = selectedSim,
-                                onInputChange = {
+                                initMcc = countryMccDraft,
+                                currentNetworkIso = selectedSim?.countryIso.orEmpty(),
+                                currentNetworkMcc = selectedSim?.mcc.orEmpty(),
+                                currentNetworkMnc = selectedSim?.mnc.orEmpty(),
+                                selectedSubId = selectedSim?.subId ?: -1,
+                                applySuccessSignal = countryIsoApplySignal,
+                                onInputChange = { iso, mcc ->
                                     onFeatureSwitchChange(
                                         feature,
-                                        FeatureValue(it, feature.valueType)
+                                        FeatureValue(iso, feature.valueType)
                                     )
+                                    onCountryMccDraftChange(mcc)
                                 },
+                                onCommitRequest = { onTextFeatureCommit(feature) },
                             )
                         } else if (feature == Feature.CARRIER_NAME) {
                             val currentCarrierName = selectedSim?.carrierName?.trim().orEmpty()
@@ -1530,6 +1625,7 @@ fun FeaturesCard(
                                         FeatureValue(it, feature.valueType)
                                     )
                                 },
+                                onCommitInput = { onTextFeatureCommit(feature) },
                             )
                         } else {
                             StringFeatureItem(
@@ -1542,6 +1638,7 @@ fun FeaturesCard(
                                         FeatureValue(it, feature.valueType)
                                     )
                                 },
+                                onCommitInput = { onTextFeatureCommit(feature) },
                             )
                         }
                     }
@@ -1625,7 +1722,22 @@ private fun normalizeCountryIso(value: String): String {
 }
 
 private fun sanitizeCountryIsoInput(value: String): String {
-    return value.lowercase(Locale.US).filter { it in 'a'..'z' }.take(2)
+    return normalizeCountryIso(value)
+        .filter { it.isLetterOrDigit() }
+        .take(8)
+}
+
+private fun sanitizeMccInput(value: String): String {
+    val cleaned = value.trim().filter { it.isDigit() || it == '-' }
+    if (cleaned.isEmpty()) return ""
+    val firstDash = cleaned.indexOf('-')
+    return if (firstDash == -1) {
+        cleaned.take(7)
+    } else {
+        val left = cleaned.substring(0, firstDash).filter { it.isDigit() }.take(3)
+        val right = cleaned.substring(firstDash + 1).filter { it.isDigit() }.take(3)
+        if (right.isNotEmpty()) "$left-$right" else left
+    }
 }
 
 @Composable
@@ -1644,45 +1756,82 @@ private fun countryIsoOptionText(option: CountryIsoOption): String {
 }
 
 private fun findCountryIsoOption(iso: String): CountryIsoOption? {
-    val normalized = normalizeCountryIso(iso)
+    val normalized = sanitizeCountryIsoInput(iso)
     if (normalized.isBlank()) return null
     return countryIsoOptions.firstOrNull { it.isoCode == normalized }
 }
 
-private fun localeCountryNameFromIso(iso: String): String {
-    val normalized = sanitizeCountryIsoInput(iso)
-    if (normalized.isBlank()) return ""
-    val countryLocale = Locale.Builder().setRegion(normalized.uppercase(Locale.US)).build()
-    val countryName = countryLocale.getDisplayCountry(Locale.getDefault())
-    return if (countryName.isNotBlank()) countryName else normalized.uppercase(Locale.US)
+private fun findCountryIsoOptionByMcc(mcc: String): CountryIsoOption? {
+    val normalized = sanitizeMccInput(mcc)
+    if (normalized.isBlank()) return null
+    return countryIsoOptions.firstOrNull { option ->
+        val optionMcc = option.mcc?.trim().orEmpty()
+        if (optionMcc.isBlank()) return@firstOrNull false
+        if (optionMcc == normalized) return@firstOrNull true
+        if (!optionMcc.contains('-')) {
+            return@firstOrNull optionMcc == normalized
+        }
+        val (start, end) = optionMcc.split('-', limit = 2)
+        val inputInt = normalized.toIntOrNull() ?: return@firstOrNull false
+        val startInt = start.toIntOrNull() ?: return@firstOrNull false
+        val endInt = end.toIntOrNull() ?: return@firstOrNull false
+        inputInt in startInt..endInt
+    }
 }
 
 @Composable
-private fun countryIsoDisplayText(iso: String, mcc: String?): String {
-    val normalized = normalizeCountryIso(iso)
-    if (normalized.isBlank()) return stringResource(R.string.country_iso_unknown)
-    val matchedOption = findCountryIsoOption(normalized)
-    if (matchedOption != null) {
-        return countryIsoOptionText(matchedOption)
+private fun currentCountryOverrideSummary(
+    overrideIso: String,
+    overrideMcc: String,
+    currentNetworkIso: String,
+    currentNetworkMcc: String,
+): String {
+    val iso = normalizeCountryIso(overrideIso)
+    val mcc = sanitizeMccInput(overrideMcc)
+    if (iso.isBlank() && mcc.isBlank()) {
+        val actualIso = normalizeCountryIso(currentNetworkIso)
+        val actualMcc = sanitizeMccInput(currentNetworkMcc)
+        if (actualIso.isBlank() && actualMcc.isBlank()) {
+            return stringResource(R.string.country_iso_not_overridden)
+        }
+        if (actualIso.isBlank()) {
+            return stringResource(R.string.country_iso_current_format_mcc_only, actualMcc)
+        }
+        val matchedByIso = findCountryIsoOption(actualIso)
+        val matchedByMcc = if (actualMcc.isNotBlank()) findCountryIsoOptionByMcc(actualMcc) else null
+        val countryName = when {
+            matchedByIso != null -> stringResource(matchedByIso.labelRes)
+            matchedByMcc != null -> stringResource(matchedByMcc.labelRes)
+            else -> actualIso.uppercase(Locale.US)
+        }
+        return if (actualMcc.isNotBlank()) {
+            stringResource(R.string.country_iso_option_format_mcc_iso, countryName, actualMcc, actualIso)
+        } else {
+            stringResource(R.string.country_iso_option_format_iso, countryName, actualIso)
+        }
     }
-    val countryName = localeCountryNameFromIso(normalized)
-    val normalizedMcc = mcc?.trim().orEmpty()
-    return if (normalizedMcc.isNotBlank()) {
-        stringResource(R.string.country_iso_option_format_mcc_iso, countryName, normalizedMcc, normalized)
+    if (mcc.isNotBlank() && iso.isBlank()) {
+        val matched = findCountryIsoOptionByMcc(mcc)
+        if (matched?.isoCode != null) {
+            val countryName = stringResource(matched.labelRes)
+            return stringResource(R.string.country_iso_option_format_mcc_iso, countryName, mcc, matched.isoCode)
+        }
+        return stringResource(R.string.country_iso_current_format_mcc_only, mcc)
+    }
+    val matchedByIso = findCountryIsoOption(iso)
+    val countryName = matchedByIso?.let { stringResource(it.labelRes) } ?: iso.uppercase(Locale.US)
+    return if (mcc.isNotBlank()) {
+        stringResource(R.string.country_iso_option_format_mcc_iso, countryName, mcc, iso)
     } else {
-        stringResource(R.string.country_iso_option_format_iso, countryName, normalized)
+        stringResource(R.string.country_iso_option_format_iso, countryName, iso)
     }
 }
 
 @Composable
-private fun countryIsoMenuItemText(option: CountryIsoOption, customInput: String): String {
-    if (option.key != COUNTRY_ISO_OPTION_OTHER) {
-        return countryIsoOptionText(option)
-    }
-    if (customInput.isBlank()) {
-        return stringResource(option.labelRes)
-    }
-    return "${stringResource(option.labelRes)} (${countryIsoDisplayText(customInput, null)})"
+private fun countryIsoMenuItemText(
+    option: CountryIsoOption,
+): String {
+    return countryIsoOptionText(option)
 }
 
 private fun saveDonationQrToGallery(
@@ -1792,47 +1941,90 @@ fun CountryIsoFeatureItem(
     title: String,
     description: String,
     initInput: String,
-    selectedSim: SimSelection?,
-    onInputChange: (String) -> Unit
+    initMcc: String,
+    currentNetworkIso: String,
+    currentNetworkMcc: String,
+    currentNetworkMnc: String,
+    selectedSubId: Int,
+    applySuccessSignal: Int,
+    onInputChange: (String, String) -> Unit,
+    onCommitRequest: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    var selectedOptionKey by remember { mutableStateOf(COUNTRY_ISO_OPTION_DEFAULT) }
-    var customInput by remember { mutableStateOf("") }
+    var selectedOptionKey by remember(selectedSubId) { mutableStateOf(COUNTRY_ISO_OPTION_DEFAULT) }
+    var customMccInput by remember(selectedSubId) { mutableStateOf("") }
+    var customIsoInput by remember(selectedSubId) { mutableStateOf("") }
+    val overrideIso = sanitizeCountryIsoInput(initInput)
+    val overrideMcc = sanitizeMccInput(initMcc)
+    val normalizedMnc = currentNetworkMnc.trim()
+    var customMccHadFocus by remember(selectedSubId) { mutableStateOf(false) }
+    var customIsoHadFocus by remember(selectedSubId) { mutableStateOf(false) }
 
-    LaunchedEffect(initInput) {
-        val normalized = normalizeCountryIso(initInput)
-        val matchedOption = countryIsoOptions.firstOrNull { it.isoCode == normalized }
-        when {
-            normalized.isBlank() -> {
-                selectedOptionKey = COUNTRY_ISO_OPTION_DEFAULT
-                customInput = ""
+    fun commitCustomInputs(
+        rawMcc: String = customMccInput,
+        rawIso: String = customIsoInput,
+        linkIsoByMcc: Boolean = false,
+    ) {
+        val sanitizedMcc = sanitizeMccInput(rawMcc)
+        val sanitizedIso = sanitizeCountryIsoInput(rawIso)
+        val linkedIso = if (linkIsoByMcc) {
+            if (sanitizedIso.isBlank()) {
+                findCountryIsoOptionByMcc(sanitizedMcc)?.isoCode ?: sanitizedIso
+            } else {
+                sanitizedIso
+            }
+        } else {
+            sanitizedIso
+        }
+        customMccInput = sanitizedMcc
+        customIsoInput = linkedIso
+        onInputChange(linkedIso, sanitizedMcc)
+        onCommitRequest()
+    }
+
+    LaunchedEffect(initInput, initMcc, applySuccessSignal, selectedSubId) {
+        val matchedOptionByIso = findCountryIsoOption(overrideIso)
+        val matchedOptionByMcc = findCountryIsoOptionByMcc(overrideMcc)
+        selectedOptionKey = when {
+            overrideIso.isBlank() && overrideMcc.isBlank() -> {
+                COUNTRY_ISO_OPTION_DEFAULT
             }
 
-            matchedOption != null -> {
-                selectedOptionKey = matchedOption.key
-                customInput = ""
+            matchedOptionByMcc != null && (overrideIso.isBlank() || overrideIso == matchedOptionByMcc.isoCode) -> {
+                matchedOptionByMcc.key
+            }
+
+            matchedOptionByIso != null && (overrideMcc.isBlank() || matchedOptionByMcc?.key == matchedOptionByIso.key) -> {
+                matchedOptionByIso.key
             }
 
             else -> {
-                selectedOptionKey = COUNTRY_ISO_OPTION_OTHER
-                customInput = sanitizeCountryIsoInput(normalized)
+                COUNTRY_ISO_OPTION_OTHER
             }
         }
+        customMccInput = overrideMcc
+        customIsoInput = overrideIso
     }
-
-    val overrideIso = normalizeCountryIso(initInput)
-    val simIso = normalizeCountryIso(selectedSim?.countryIso.orEmpty())
-    val currentSettingText = when {
-        overrideIso.isNotBlank() -> countryIsoDisplayText(overrideIso, null)
-        simIso.isNotBlank() -> countryIsoDisplayText(simIso, selectedSim?.mcc)
-        else -> stringResource(R.string.country_iso_unknown)
+    val dropdownDisplayText = if (selectedOptionKey == COUNTRY_ISO_OPTION_DEFAULT) {
+        stringResource(
+            R.string.country_iso_current_value,
+            currentCountryOverrideSummary(
+                overrideIso = overrideIso,
+                overrideMcc = overrideMcc,
+                currentNetworkIso = currentNetworkIso,
+                currentNetworkMcc = currentNetworkMcc,
+            )
+        )
+    } else {
+        countryIsoMenuItemText(
+            countryIsoOptions.firstOrNull { it.key == selectedOptionKey } ?: countryIsoOptions.first()
+        )
     }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1F)) {
             ExposedDropdownMenuBox(
@@ -1843,7 +2035,7 @@ fun CountryIsoFeatureItem(
                     modifier = Modifier
                         .fillMaxWidth()
                         .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-                    value = currentSettingText,
+                    value = dropdownDisplayText,
                     onValueChange = {},
                     readOnly = true,
                     label = {
@@ -1854,7 +2046,7 @@ fun CountryIsoFeatureItem(
                         )
                     },
                     placeholder = {
-                        Text(description)
+                        Text(stringResource(R.string.country_iso_quick_pick_placeholder))
                     },
                     singleLine = true,
                     maxLines = 1,
@@ -1865,9 +2057,11 @@ fun CountryIsoFeatureItem(
                         Text(
                             text = description,
                             fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.outline
+                            color = MaterialTheme.colorScheme.outline,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
-                    }
+                    },
                 )
                 ExposedDropdownMenu(
                     expanded = expanded,
@@ -1875,24 +2069,23 @@ fun CountryIsoFeatureItem(
                 ) {
                     countryIsoOptions.forEach { option ->
                         DropdownMenuItem(
-                            text = { Text(countryIsoMenuItemText(option, customInput)) },
+                            text = { Text(countryIsoMenuItemText(option)) },
                             onClick = {
                                 expanded = false
                                 selectedOptionKey = option.key
                                 when (option.key) {
-                                    COUNTRY_ISO_OPTION_DEFAULT -> {
-                                        customInput = ""
-                                        onInputChange("")
-                                    }
-
                                     COUNTRY_ISO_OPTION_OTHER -> {
-                                        customInput = ""
-                                        onInputChange("")
+                                        customMccInput = overrideMcc
+                                        customIsoInput = overrideIso
                                     }
 
                                     else -> {
-                                        customInput = ""
-                                        onInputChange(option.isoCode.orEmpty())
+                                        val selectedIso = option.isoCode.orEmpty()
+                                        val selectedMcc = option.mcc.orEmpty()
+                                        customMccInput = selectedMcc
+                                        customIsoInput = selectedIso
+                                        onInputChange(selectedIso, selectedMcc)
+                                        onCommitRequest()
                                     }
                                 }
                             },
@@ -1900,37 +2093,74 @@ fun CountryIsoFeatureItem(
                     }
                 }
             }
-            if (selectedOptionKey == COUNTRY_ISO_OPTION_OTHER) {
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    modifier = Modifier.fillMaxWidth(),
-                    value = customInput,
-                    onValueChange = {
-                        val sanitized = sanitizeCountryIsoInput(it)
-                        customInput = sanitized
-                        onInputChange(sanitized)
-                    },
-                    label = {
-                        Text(
-                            stringResource(R.string.country_iso_custom_label),
-                            fontSize = 14.sp
-                        )
-                    },
-                    placeholder = {
-                        Text(stringResource(R.string.country_iso_custom_placeholder))
-                    },
-                    singleLine = true,
-                    maxLines = 1,
-                    keyboardOptions = KeyboardOptions(
-                        imeAction = ImeAction.Done,
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onDone = {
-                            onInputChange(customInput)
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { focusState ->
+                        if (focusState.isFocused) {
+                            customMccHadFocus = true
+                        } else if (customMccHadFocus) {
+                            customMccHadFocus = false
+                            commitCustomInputs(linkIsoByMcc = true)
                         }
-                    ),
-                )
-            }
+                    },
+                value = customMccInput,
+                onValueChange = { raw ->
+                    selectedOptionKey = COUNTRY_ISO_OPTION_OTHER
+                    customMccInput = sanitizeMccInput(raw)
+                },
+                label = { Text(stringResource(R.string.country_iso_mcc_label), fontSize = 14.sp) },
+                placeholder = { Text(stringResource(R.string.country_iso_mcc_placeholder)) },
+                singleLine = true,
+                maxLines = 1,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { commitCustomInputs(linkIsoByMcc = true) }),
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { focusState ->
+                        if (focusState.isFocused) {
+                            customIsoHadFocus = true
+                        } else if (customIsoHadFocus) {
+                            customIsoHadFocus = false
+                            commitCustomInputs()
+                        }
+                    },
+                value = customIsoInput,
+                onValueChange = { raw ->
+                    selectedOptionKey = COUNTRY_ISO_OPTION_OTHER
+                    customIsoInput = sanitizeCountryIsoInput(raw)
+                },
+                label = { Text(stringResource(R.string.country_iso_iso_label), fontSize = 14.sp) },
+                placeholder = { Text(stringResource(R.string.country_iso_custom_placeholder)) },
+                singleLine = true,
+                maxLines = 1,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { commitCustomInputs() }),
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = normalizedMnc,
+                onValueChange = {},
+                readOnly = true,
+                label = { Text(stringResource(R.string.country_iso_mnc_label), fontSize = 14.sp) },
+                placeholder = { Text(stringResource(R.string.country_iso_mnc_placeholder)) },
+                singleLine = true,
+                maxLines = 1,
+                supportingText = {
+                    Text(
+                        text = stringResource(R.string.country_iso_mnc_desc),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.outline,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
+            )
         }
     }
 }
@@ -1940,9 +2170,11 @@ fun StringFeatureItem(
     title: String,
     description: String,
     initInput: String,
-    onInputChange: (String) -> Unit
+    onInputChange: (String) -> Unit,
+    onCommitInput: (String) -> Unit,
 ) {
     var input by remember { mutableStateOf(initInput) }
+    var hadFocus by remember { mutableStateOf(false) }
     LaunchedEffect(initInput) {
         input = initInput
     }
@@ -1954,7 +2186,15 @@ fun StringFeatureItem(
     ) {
         OutlinedTextField(
             modifier = Modifier
-                .weight(1F),
+                .weight(1F)
+                .onFocusChanged { focusState ->
+                    if (focusState.isFocused) {
+                        hadFocus = true
+                    } else if (hadFocus) {
+                        hadFocus = false
+                        onCommitInput(input)
+                    }
+                },
             value = input,
             onValueChange = {
                 input = it
@@ -1981,7 +2221,7 @@ fun StringFeatureItem(
             ),
             keyboardActions = KeyboardActions(
                 onDone = {
-                    onInputChange(input)
+                    onCommitInput(input)
                 }
             ),
         )
@@ -2016,48 +2256,6 @@ fun BooleanFeatureItem(
             enabled = enabled,
             onCheckedChange = onCheckedChange
         )
-    }
-}
-
-@Composable
-fun MainActionButtons(
-    onApplyConfiguration: () -> Unit,
-    onDumpConfig: () -> Unit,
-    applyingConfiguration: Boolean = false,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Button(
-            onClick = onApplyConfiguration,
-            enabled = !applyingConfiguration,
-            modifier = Modifier
-                .weight(1f)
-                .height(52.dp),
-        ) {
-            Text(
-                text = stringResource(
-                    id = if (applyingConfiguration) {
-                        R.string.apply_config_running
-                    } else {
-                        R.string.apply_config
-                    }
-                )
-            )
-        }
-        Button(
-            onClick = onDumpConfig,
-            enabled = !applyingConfiguration,
-            modifier = Modifier
-                .weight(1f)
-                .height(52.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
-        ) {
-            Text(text = stringResource(id = R.string.dump_config))
-        }
     }
 }
 

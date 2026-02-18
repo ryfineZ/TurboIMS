@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Turbo IMS</string>
+    <string name="app_name">Carrier IMS</string>
     <string name="for_pixel">forked by Mystery0</string>
+    <string name="brand_name">Carrier IMS for Pixel</string>
+    <string name="brand_subtitle">TurboIMS Fork · Carrier and IMS Toolkit</string>
 
     <!-- Main Screen -->
     <string name="system_info">System Info</string>
@@ -31,11 +33,11 @@
     <string name="ims_registration_status">IMS Registration</string>
     <string name="ims_registration_status_desc">If IMS is unregistered, all features below are unavailable.</string>
     <string name="ims_registration_per_sim_desc">In All SIM mode, IMS registration is handled per SIM and results may differ.</string>
-    <string name="all_sim_switch_only_desc">Switches take effect immediately; tap \"Apply\" after editing text fields.</string>
+    <string name="all_sim_switch_only_desc">All switches apply instantly.</string>
     <string name="carrier_name">Carrier Name</string>
     <string name="carrier_name_desc">Used to change the carrier label shown by the system (for example, status bar carrier text)</string>
     <string name="country_iso">Country ISO</string>
-    <string name="country_iso_desc">Used to set the carrier country/region identity (ISO code)</string>
+    <string name="country_iso_desc">Use quick presets or manual MCC/ISO input; leave MCC empty to override ISO only.</string>
     <string name="country_iso_option_default">System default (no override)</string>
     <string name="country_iso_option_china_mainland">China Mainland</string>
     <string name="country_iso_option_hong_kong">Hong Kong, China</string>
@@ -45,13 +47,26 @@
     <string name="country_iso_option_uk">United Kingdom</string>
     <string name="country_iso_option_korea">South Korea</string>
     <string name="country_iso_option_singapore">Singapore</string>
-    <string name="country_iso_option_other">Other</string>
+    <string name="country_iso_option_other">Custom (manual MCC + ISO)</string>
     <string name="country_iso_option_format_mcc_iso">%1$s MCC: %2$s (ISO: %3$s)</string>
     <string name="country_iso_option_format_iso">%1$s (ISO: %2$s)</string>
+    <string name="country_iso_current_format_iso_actual_mcc">%1$s (ISO: %2$s, actual MCC: %3$s)</string>
     <string name="country_iso_unknown">Unknown</string>
     <string name="country_iso_current_value">Current setting: %s</string>
-    <string name="country_iso_custom_label">Custom country ISO (2 letters)</string>
-    <string name="country_iso_custom_placeholder">Enter two-letter code, e.g. fr</string>
+    <string name="country_iso_not_overridden">Not overridden</string>
+    <string name="country_iso_current_format_mcc_only">MCC: %s</string>
+    <string name="country_iso_actual_mcc_note">Current network MCC: %1$s (ISO override only, MCC unchanged)</string>
+    <string name="country_iso_actual_mcc_mnc_note">Current network MCC/MNC: %1$s/%2$s (ISO override only, MCC unchanged)</string>
+    <string name="country_iso_mcc_label">MCC</string>
+    <string name="country_iso_mcc_placeholder">e.g. 460 / 310 / 310-316</string>
+    <string name="country_iso_mnc_label">MNC (read-only)</string>
+    <string name="country_iso_mnc_placeholder">No MNC available</string>
+    <string name="country_iso_mnc_desc">Current SIM MNC, used to build MCCMNC for carrier matching</string>
+    <string name="country_iso_iso_label">ISO</string>
+    <string name="country_iso_quick_pick_label">Country Quick Pick</string>
+    <string name="country_iso_quick_pick_placeholder">Pick a common country, or choose \"Other\" to input MCC + ISO</string>
+    <string name="country_iso_custom_label">Manual ISO</string>
+    <string name="country_iso_custom_placeholder">e.g. cn / us / 11111</string>
     <string name="ims_user_agent">IMS User Agent</string>
     <string name="ims_user_agent_desc">Sets the IMS registration identity string for compatibility</string>
     <string name="issue_info_copied">System info copied to clipboard</string>
@@ -62,22 +77,32 @@
     <string name="action_issue">Issue</string>
     <string name="action_logcat">Logs</string>
     <string name="action_update">Update</string>
-    <string name="captive_portal_fix_title">Wi-Fi Fix</string>
-    <string name="captive_portal_fix_action">One-tap Wi-Fi Fix</string>
-    <string name="captive_portal_fix_running">Fixing Wi-Fi…</string>
-    <string name="captive_portal_fix_desc">Fixes the case where Wi-Fi is connected in China but shows \"Restricted\" or an exclamation mark and has no internet.</string>
+    <string name="captive_portal_fix_title">Network Verification Fix</string>
+    <string name="captive_portal_fix_action">One-tap Network Fix</string>
+    <string name="captive_portal_fix_restore_action">Restore Default</string>
+    <string name="captive_portal_fix_normal_action">Network OK</string>
+    <string name="captive_portal_fix_running">Fixing network…</string>
+    <string name="captive_portal_restore_running">Restoring default verification URLs…</string>
+    <string name="captive_portal_fix_checking">Checking…</string>
+    <string name="captive_portal_fix_desc">Fixes cases where network is connected in China but shows \"Restricted\" or an exclamation mark and has no internet.</string>
+    <string name="captive_portal_fix_status_checking">Checking current verification URLs and network reachability…</string>
+    <string name="captive_portal_fix_status_need_fix">Default verification may be unreachable. A one-tap fix is recommended.</string>
+    <string name="captive_portal_fix_status_restorable">China (.cn) verification URLs are active. You can restore system defaults anytime.</string>
+    <string name="captive_portal_fix_status_normal">Verification network is reachable. No fix needed.</string>
     <string name="captive_portal_fix_requires_shizuku">Start and authorize Shizuku before running this fix.</string>
-    <string name="captive_portal_fix_success">Wi-Fi fix applied. If the exclamation mark remains, reconnect Wi-Fi.</string>
-    <string name="captive_portal_fix_failed">Wi-Fi fix failed: %s</string>
-    <string name="donation_action">Support</string>
+    <string name="captive_portal_fix_success">Network fix applied. If the status does not update, reconnect the network and retry.</string>
+    <string name="captive_portal_fix_failed">Network fix failed: %s</string>
+    <string name="captive_portal_restore_success">System default verification URLs restored</string>
+    <string name="captive_portal_restore_failed">Restore default failed: %s</string>
+    <string name="donation_action">Support Author</string>
     <string name="donation_support_desc">If Turbo IMS helps you, donations are welcome to support ongoing maintenance.</string>
     <string name="donation_sheet_title">Support Turbo IMS Updates</string>
     <string name="donation_sheet_desc">Your support helps with device adaptation, system compatibility, and bug fixes.</string>
     <string name="donation_wechat">WeChat</string>
     <string name="donation_alipay">Alipay</string>
-    <string name="donation_pay_now">Pay Now</string>
+    <string name="donation_pay_now">Buy Me a Coffee</string>
     <string name="donation_save_button">Save QR</string>
-    <string name="donation_save_tip">Pay Now saves to gallery (DCIM/TurboIMS) first, then opens the payment app (target page depends on QR type).</string>
+    <string name="donation_save_tip">Buy Me a Coffee saves to gallery (DCIM/TurboIMS) first, then opens the payment app (target page depends on QR type).</string>
     <string name="donation_feedback_title">Donation Action</string>
     <string name="donation_save_success">QR code saved to gallery</string>
     <string name="donation_save_success_with_path">QR code saved to gallery: %s</string>
@@ -106,14 +131,19 @@
     <string name="_5g_plus_icon_desc">Adapt to China mainland 5GA signal</string>
     <string name="show_4g_for_lte">Show 4G for LTE</string>
     <string name="show_4g_for_lte_desc">Show 4G icon for LTE data</string>
+    <string name="tiktok_network_fix">Fix TikTok No Network</string>
+    <string name="tiktok_network_fix_desc">Domestic SIM only: ON uses random numeric ISO; OFF restores country ISO by SIM home profile.</string>
 
     <!-- Button -->
     <string name="apply_config">Apply</string>
     <string name="apply_config_running">Applying…</string>
-    <string name="reset_config">Reset</string>
+    <string name="reset_config">Restore Carrier Default</string>
     <string name="reset_config_desc">Reset clears current SIM overrides and restores carrier defaults.</string>
     <string name="restart_ims">Restart IMS</string>
-    <string name="dump_config">Dump Config</string>
+    <string name="dump_config">View Full Config</string>
+    <string name="restore_confirm_title">Confirm Restore</string>
+    <string name="restore_confirm_message">This clears current SIM overrides and restores current system carrier configuration. Continue?</string>
+    <string name="restore_confirm_action">Restore</string>
 
     <!-- Tips -->
     <string name="tip">Tips:</string>
