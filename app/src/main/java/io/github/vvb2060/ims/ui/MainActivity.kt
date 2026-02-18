@@ -4,16 +4,22 @@ import android.app.DownloadManager
 import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.Settings
+import android.provider.MediaStore
 import android.widget.Toast
 import androidx.activity.viewModels
+import androidx.annotation.DrawableRes
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -24,6 +30,7 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -31,6 +38,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -45,12 +53,14 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -69,8 +79,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
@@ -114,6 +126,12 @@ private const val RELEASES_LATEST_API_URL =
     "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases/latest"
 private const val UPDATE_APK_MIME_TYPE = "application/vnd.android.package-archive"
 private const val UNKNOWN_INSTALLER_SOURCE_SETTINGS_SCHEME = "package:"
+private const val WECHAT_PACKAGE_NAME = "com.tencent.mm"
+private const val ALIPAY_PACKAGE_NAME = "com.eg.android.AlipayGphone"
+private const val ALIPAY_DONATION_URL = "https://qr.alipay.com/2m610390t3ynw5ypko3li1b"
+private const val ALIPAY_SCAN_QR_ACTIVITY =
+    "com.alipay.mobile.quinox.splash.ShareScanQRDispenseActivity"
+private const val DONATION_QR_MIME_TYPE = "image/png"
 
 private data class ReleaseInfo(
     val version: String,
@@ -129,6 +147,11 @@ private data class UpdateDialogState(
 private data class ApplyResultDialogState(
     val success: Boolean,
     val message: String,
+)
+
+private data class SavedDonationQr(
+    val uri: Uri,
+    val path: String,
 )
 
 private data class CountryIsoOption(
@@ -264,6 +287,8 @@ class MainActivity : BaseActivity() {
         var checkingUpdate by remember { mutableStateOf(false) }
         var updateDialogState by remember { mutableStateOf<UpdateDialogState?>(null) }
         var applyResultDialogState by remember { mutableStateOf<ApplyResultDialogState?>(null) }
+        var showDonationSheet by remember { mutableStateOf(false) }
+        var donationFeedbackMessage by remember { mutableStateOf<String?>(null) }
         val featureSwitches = remember { mutableStateMapOf<Feature, FeatureValue>() }
         val committedFeatureSwitches = remember { mutableStateMapOf<Feature, FeatureValue>() }
         val submitIssueAction: () -> Unit = {
@@ -450,6 +475,9 @@ class MainActivity : BaseActivity() {
                         }
                     },
                     onIssueClick = submitIssueAction,
+                    onDonateClick = {
+                        showDonationSheet = true
+                    },
                 )
                 if (shizukuStatus == ShizukuStatus.READY) {
                     SimCardSelectionCard(selectedSim, allSimList, onSelectSim = {
@@ -788,6 +816,97 @@ class MainActivity : BaseActivity() {
                             TextButton(onClick = { applyResultDialogState = null }) {
                                 Text(stringResource(id = android.R.string.ok))
                             }
+                        },
+                        dismissButton = if (state.success) {
+                            {
+                                TextButton(
+                                    onClick = {
+                                        applyResultDialogState = null
+                                        showDonationSheet = true
+                                    }
+                                ) {
+                                    Text(stringResource(R.string.donation_action))
+                                }
+                            }
+                        } else {
+                            null
+                        },
+                    )
+                }
+                if (showDonationSheet) {
+                    DonationBottomSheet(
+                        onDismissRequest = {
+                            showDonationSheet = false
+                        },
+                        onOpenWeChat = {
+                            val savedQr = saveDonationQrToGallery(
+                                context = context,
+                                imageRes = R.drawable.donate_wechat,
+                                filePrefix = "turboims_wechat",
+                            )
+                            donationFeedbackMessage = if (savedQr == null) {
+                                context.getString(R.string.donation_save_failed)
+                            } else {
+                                val opened = openWeChatDonationPage(context)
+                                if (opened) {
+                                    context.getString(
+                                        R.string.donation_open_wechat_hint_with_path,
+                                        savedQr.path
+                                    )
+                                } else {
+                                    context.getString(R.string.donation_open_wechat_failed)
+                                }
+                            }
+                            showDonationSheet = false
+                            Toast.makeText(context, donationFeedbackMessage, Toast.LENGTH_LONG).show()
+                        },
+                        onOpenAlipay = {
+                            val savedQr = saveDonationQrToGallery(
+                                context = context,
+                                imageRes = R.drawable.donate_alipay,
+                                filePrefix = "turboims_alipay",
+                            )
+                            donationFeedbackMessage = if (savedQr == null) {
+                                context.getString(R.string.donation_save_failed)
+                            } else {
+                                val opened = openAlipayDonationPage(context, savedQr.uri)
+                                if (opened) {
+                                    context.getString(
+                                        R.string.donation_open_alipay_hint_with_path,
+                                        savedQr.path
+                                    )
+                                } else {
+                                    context.getString(R.string.donation_open_alipay_failed)
+                                }
+                            }
+                            showDonationSheet = false
+                            Toast.makeText(context, donationFeedbackMessage, Toast.LENGTH_LONG).show()
+                        },
+                        onSaveImage = { imageRes, filePrefix ->
+                            val savedPath = saveDonationQrToGallery(context, imageRes, filePrefix)
+                            donationFeedbackMessage = if (savedPath != null) {
+                                context.getString(R.string.donation_save_success_with_path, savedPath.path)
+                            } else {
+                                context.getString(R.string.donation_save_failed)
+                            }
+                            showDonationSheet = false
+                            Toast.makeText(context, donationFeedbackMessage, Toast.LENGTH_LONG).show()
+                        },
+                    )
+                }
+                if (donationFeedbackMessage != null) {
+                    AlertDialog(
+                        onDismissRequest = { donationFeedbackMessage = null },
+                        title = {
+                            Text(text = stringResource(R.string.donation_feedback_title))
+                        },
+                        text = {
+                            Text(text = donationFeedbackMessage!!)
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { donationFeedbackMessage = null }) {
+                                Text(stringResource(id = android.R.string.ok))
+                            }
                         }
                     )
                 }
@@ -962,6 +1081,7 @@ fun SystemInfoCard(
     onCheckUpdate: () -> Unit,
     onLogcatClick: () -> Unit,
     onIssueClick: () -> Unit,
+    onDonateClick: () -> Unit,
 ) {
     val uriHandler = LocalUriHandler.current
     val shizukuStatusText = when (shizukuStatus) {
@@ -1060,7 +1180,31 @@ fun SystemInfoCard(
                     Text(text = stringResource(id = R.string.request_permission))
                 }
             }
-
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(thickness = 0.5.dp)
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = stringResource(R.string.donation_support_desc),
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.outline
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = onDonateClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                )
+            ) {
+                Text(
+                    text = stringResource(R.string.donation_action),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
         }
     }
 }
@@ -1457,6 +1601,108 @@ private fun countryIsoMenuItemText(option: CountryIsoOption, customInput: String
     return "${stringResource(option.labelRes)} (${countryIsoDisplayText(customInput, null)})"
 }
 
+private fun saveDonationQrToGallery(
+    context: Context,
+    @DrawableRes imageRes: Int,
+    filePrefix: String,
+): SavedDonationQr? {
+    val bitmap = BitmapFactory.decodeResource(context.resources, imageRes) ?: return null
+    val resolver = context.contentResolver
+    val displayName = "${filePrefix}_${System.currentTimeMillis()}.png"
+    val relativePath = "${Environment.DIRECTORY_DCIM}/TurboIMS"
+    val values = ContentValues().apply {
+        put(MediaStore.Images.Media.DISPLAY_NAME, displayName)
+        put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            put(MediaStore.Images.Media.RELATIVE_PATH, relativePath)
+            put(MediaStore.Images.Media.IS_PENDING, 1)
+        }
+    }
+    val imageUri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: run {
+        bitmap.recycle()
+        return null
+    }
+    return runCatching {
+        resolver.openOutputStream(imageUri)?.use { output ->
+            check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output))
+        } ?: error("openOutputStream failed")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val publishValues = ContentValues().apply {
+                put(MediaStore.Images.Media.IS_PENDING, 0)
+            }
+            resolver.update(imageUri, publishValues, null, null)
+        }
+        val displayPath = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            "$relativePath/$displayName"
+        } else {
+            "/sdcard/$relativePath/$displayName"
+        }
+        SavedDonationQr(uri = imageUri, path = displayPath)
+    }.getOrElse {
+        resolver.delete(imageUri, null, null)
+        null
+    }.also {
+        bitmap.recycle()
+    }
+}
+
+private fun openAlipayDonationPage(context: Context, donationQrUri: Uri): Boolean {
+    val qrClipData = ClipData.newRawUri("turboims_alipay_qr", donationQrUri)
+    val intents = listOf(
+        Intent(
+            Intent.ACTION_VIEW,
+            "alipays://platformapi/startapp?saId=10000007&qrcode=${Uri.encode(ALIPAY_DONATION_URL)}".toUri()
+        ).setPackage(ALIPAY_PACKAGE_NAME),
+        Intent(Intent.ACTION_VIEW, ALIPAY_DONATION_URL.toUri()).setPackage(ALIPAY_PACKAGE_NAME),
+        Intent(Intent.ACTION_VIEW, ALIPAY_DONATION_URL.toUri()),
+        Intent(Intent.ACTION_VIEW)
+            .setClassName(ALIPAY_PACKAGE_NAME, ALIPAY_SCAN_QR_ACTIVITY)
+            .setDataAndType(donationQrUri, DONATION_QR_MIME_TYPE)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            .apply { clipData = qrClipData },
+        Intent(Intent.ACTION_SEND)
+            .setClassName(ALIPAY_PACKAGE_NAME, ALIPAY_SCAN_QR_ACTIVITY)
+            .setType(DONATION_QR_MIME_TYPE)
+            .putExtra(Intent.EXTRA_STREAM, donationQrUri)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            .apply { clipData = qrClipData },
+    )
+    return startDonationIntentCandidates(context, intents)
+}
+
+private fun openWeChatDonationPage(context: Context): Boolean {
+    val launchIntent = context.packageManager
+        .getLaunchIntentForPackage(WECHAT_PACKAGE_NAME)
+        ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    if (launchIntent != null) {
+        return runCatching {
+            context.startActivity(launchIntent)
+            true
+        }.getOrElse { false }
+    }
+    return false
+}
+
+private fun startDonationIntentCandidates(context: Context, intents: List<Intent>): Boolean {
+    intents.forEach { intent ->
+        val launchIntent = intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val resolved = runCatching {
+            context.packageManager.resolveActivity(launchIntent, 0)
+        }.getOrNull()
+        if (resolved == null) {
+            return@forEach
+        }
+        val started = runCatching {
+            context.startActivity(launchIntent)
+            true
+        }.getOrElse { false }
+        if (started) {
+            return true
+        }
+    }
+    return false
+}
+
 @Composable
 fun CountryIsoFeatureItem(
     title: String,
@@ -1764,6 +2010,112 @@ private fun IssueReportHintCard(
             ) {
                 Text(text = stringResource(R.string.issue_failure_submit))
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DonationBottomSheet(
+    onDismissRequest: () -> Unit,
+    onOpenWeChat: () -> Unit,
+    onOpenAlipay: () -> Unit,
+    onSaveImage: (Int, String) -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismissRequest) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.donation_sheet_title),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.donation_sheet_desc),
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.outline
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            DonationQrCard(
+                label = stringResource(R.string.donation_wechat),
+                imageRes = R.drawable.donate_wechat,
+                onPayClick = onOpenWeChat,
+                onSaveImage = {
+                    onSaveImage(R.drawable.donate_wechat, "turboims_wechat")
+                }
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            DonationQrCard(
+                label = stringResource(R.string.donation_alipay),
+                imageRes = R.drawable.donate_alipay,
+                onPayClick = onOpenAlipay,
+                onSaveImage = {
+                    onSaveImage(R.drawable.donate_alipay, "turboims_alipay")
+                }
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+        }
+    }
+}
+
+@Composable
+private fun DonationQrCard(
+    label: String,
+    imageRes: Int,
+    onPayClick: () -> Unit,
+    onSaveImage: () -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = label,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Image(
+                painter = painterResource(imageRes),
+                contentDescription = label,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 280.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable(onClick = onSaveImage)
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Button(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(40.dp),
+                    onClick = onPayClick,
+                ) {
+                    Text(text = stringResource(R.string.donation_pay_now))
+                }
+                Button(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(40.dp),
+                    onClick = onSaveImage,
+                ) {
+                    Text(text = stringResource(R.string.donation_save_button))
+                }
+            }
+            Text(
+                text = stringResource(R.string.donation_save_tip),
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.outline
+            )
         }
     }
 }
