@@ -285,6 +285,7 @@ class MainActivity : BaseActivity() {
         val imsRegistrationLoadingMap = remember { mutableStateMapOf<Int, Boolean>() }
         var applyingConfiguration by remember { mutableStateOf(false) }
         var checkingUpdate by remember { mutableStateOf(false) }
+        var fixingCaptivePortal by remember { mutableStateOf(false) }
         var updateDialogState by remember { mutableStateOf<UpdateDialogState?>(null) }
         var applyResultDialogState by remember { mutableStateOf<ApplyResultDialogState?>(null) }
         var showDonationSheet by remember { mutableStateOf(false) }
@@ -478,6 +479,35 @@ class MainActivity : BaseActivity() {
                     onDonateClick = {
                         showDonationSheet = true
                     },
+                )
+                CaptivePortalFixCard(
+                    shizukuStatus = shizukuStatus,
+                    fixingCaptivePortal = fixingCaptivePortal,
+                    onFixCaptivePortal = {
+                        if (fixingCaptivePortal) return@CaptivePortalFixCard
+                        if (shizukuStatus != ShizukuStatus.READY) {
+                            Toast.makeText(context, R.string.shizuku_not_running_msg, Toast.LENGTH_LONG).show()
+                            return@CaptivePortalFixCard
+                        }
+                        scope.launch {
+                            fixingCaptivePortal = true
+                            val resultMsg = viewModel.applyCaptivePortalCnUrls()
+                            fixingCaptivePortal = false
+                            if (resultMsg == null) {
+                                Toast.makeText(
+                                    context,
+                                    R.string.captive_portal_fix_success,
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            } else {
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.captive_portal_fix_failed, resultMsg),
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
+                    }
                 )
                 if (shizukuStatus == ShizukuStatus.READY) {
                     SimCardSelectionCard(selectedSim, allSimList, onSelectSim = {
@@ -1203,6 +1233,60 @@ fun SystemInfoCard(
                     text = stringResource(R.string.donation_action),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun CaptivePortalFixCard(
+    shizukuStatus: ShizukuStatus,
+    fixingCaptivePortal: Boolean,
+    onFixCaptivePortal: () -> Unit,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = 16.dp),
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text(
+                text = stringResource(R.string.captive_portal_fix_title),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.captive_portal_fix_desc),
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.outline,
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            val isReady = shizukuStatus == ShizukuStatus.READY
+            Button(
+                onClick = onFixCaptivePortal,
+                enabled = isReady && !fixingCaptivePortal,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp)
+            ) {
+                Text(
+                    text = if (fixingCaptivePortal) {
+                        stringResource(R.string.captive_portal_fix_running)
+                    } else {
+                        stringResource(R.string.captive_portal_fix_action)
+                    }
+                )
+            }
+            if (!isReady) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = stringResource(R.string.captive_portal_fix_requires_shizuku),
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.outline
                 )
             }
         }

@@ -48,6 +48,16 @@ TurboIMS 是一个允许您在 Google Pixel 手机上启用或禁用 VoLTE（高
     - **5G 信号强度阈值**: 可选择是否应用自定义的 5G 信号强度阈值。
 - **配置持久化**: 自动保存每张 SIM 卡的配置。
 
+## 最新版本更新（3.8.3）
+
+- 新增「Wi-Fi 异常修复」独立卡片，提供小白可用的一键修复入口。
+- 新增「一键修复 Wi-Fi 网络」能力：修复国内 Wi‑Fi 显示网络受限/感叹号且无法上网。
+- 优化修复文案与交互反馈，降低技术门槛。
+- 统一系统信息、Wi‑Fi 修复卡片与 SIM 区块间距，布局更一致。
+- 发布说明与文档同步更新。
+
+完整变更请查看 [CHANGELOG.md](CHANGELOG.md) 与 [Releases](https://github.com/ryfineZ/TurboIMS/releases)。
+
 ## 要求
 
 - **支持设备**: 搭载 Google Tensor 芯片 (GS101, GS201, Zuma, Zuma Pro) 的 Pixel 设备。

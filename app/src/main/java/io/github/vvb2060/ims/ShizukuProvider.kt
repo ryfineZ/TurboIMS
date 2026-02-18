@@ -12,6 +12,7 @@ import android.telephony.SubscriptionInfo
 import android.util.Log
 import io.github.vvb2060.ims.model.SimSelection
 import io.github.vvb2060.ims.privileged.BrokerInstrumentation
+import io.github.vvb2060.ims.privileged.CaptivePortalFixer
 import io.github.vvb2060.ims.privileged.ConfigReader
 import io.github.vvb2060.ims.privileged.ImsResetter
 import io.github.vvb2060.ims.privileged.ImsStatusReader
@@ -134,6 +135,18 @@ class ShizukuProvider : ShizukuProvider() {
                 putBoolean(ImsModifier.BUNDLE_PREFER_PERSISTENT, canUsePersistentOverride)
             }
             return overrideImsConfig(context, bundle)
+        }
+
+        suspend fun applyCaptivePortalCnUrls(context: Context): String? {
+            val result = startInstrumentation(context, CaptivePortalFixer::class.java, null, true)
+            if (result == null) {
+                return "failed with empty result"
+            }
+            return if (result.getBoolean(CaptivePortalFixer.BUNDLE_RESULT)) {
+                null
+            } else {
+                result.getString(CaptivePortalFixer.BUNDLE_RESULT_MSG) ?: "unknown error"
+            }
         }
 
         private suspend fun startInstrumentation(

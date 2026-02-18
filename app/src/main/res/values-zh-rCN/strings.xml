@@ -62,6 +62,13 @@
     <string name="action_issue">Issue</string>
     <string name="action_logcat">日志</string>
     <string name="action_update">更新</string>
+    <string name="captive_portal_fix_title">Wi-Fi 异常修复</string>
+    <string name="captive_portal_fix_action">一键修复 Wi-Fi 网络</string>
+    <string name="captive_portal_fix_running">正在修复 Wi-Fi 网络…</string>
+    <string name="captive_portal_fix_desc">用于修复国内 Wi-Fi 已连接但显示网络受限或感叹号、无法上网的问题</string>
+    <string name="captive_portal_fix_requires_shizuku">需要先启动并授权 Shizuku 才能执行修复</string>
+    <string name="captive_portal_fix_success">Wi-Fi 网络修复完成；若仍有感叹号，请断开并重新连接 Wi-Fi。</string>
+    <string name="captive_portal_fix_failed">Wi-Fi 网络修复失败：%s</string>
     <string name="donation_action">支持开发</string>
     <string name="donation_support_desc">如果 Turbo IMS 对你有帮助，欢迎打赏支持持续维护。</string>
     <string name="donation_sheet_title">支持 Turbo IMS 持续更新</string>

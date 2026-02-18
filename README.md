@@ -29,6 +29,16 @@ Android 16（尤其 2026-01 安全补丁之后）对 `CarrierConfig` 的 **persi
 - **Dump 当前 CarrierConfig（可过滤关键字）**
 - **QS 快捷图块**：VoLTE Toggle / IMS Status
 
+## 最新版本更新（3.8.3）
+
+- 新增「Wi-Fi 异常修复」独立卡片，提供小白可用的一键修复入口
+- 新增「一键修复 Wi-Fi 网络」能力：修复国内 Wi‑Fi 显示网络受限/感叹号且无法上网
+- 优化修复文案与交互反馈，降低技术门槛
+- 统一系统信息、Wi‑Fi 修复卡片与 SIM 区块间距，布局更一致
+- 发布说明与文档同步更新
+
+完整变更请见 [CHANGELOG.md](CHANGELOG.md) 与 [Releases](https://github.com/ryfineZ/TurboIMS/releases)。
+
 ## 系统要求
 
 - Pixel Tensor 机型（Pixel 6/7/8/9/10 系列、Fold/Tablet）

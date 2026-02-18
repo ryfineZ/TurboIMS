@@ -62,6 +62,13 @@
     <string name="action_issue">Issue</string>
     <string name="action_logcat">Logs</string>
     <string name="action_update">Update</string>
+    <string name="captive_portal_fix_title">Wi-Fi Fix</string>
+    <string name="captive_portal_fix_action">One-tap Wi-Fi Fix</string>
+    <string name="captive_portal_fix_running">Fixing Wi-Fi…</string>
+    <string name="captive_portal_fix_desc">Fixes the case where Wi-Fi is connected in China but shows \"Restricted\" or an exclamation mark and has no internet.</string>
+    <string name="captive_portal_fix_requires_shizuku">Start and authorize Shizuku before running this fix.</string>
+    <string name="captive_portal_fix_success">Wi-Fi fix applied. If the exclamation mark remains, reconnect Wi-Fi.</string>
+    <string name="captive_portal_fix_failed">Wi-Fi fix failed: %s</string>
     <string name="donation_action">Support</string>
     <string name="donation_support_desc">If Turbo IMS helps you, donations are welcome to support ongoing maintenance.</string>
     <string name="donation_sheet_title">Support Turbo IMS Updates</string>

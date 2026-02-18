@@ -369,6 +369,19 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
         return ImsRegisterResult(status, null)
     }
 
+    suspend fun applyCaptivePortalCnUrls(): String? {
+        val resultMsg = ShizukuProvider.applyCaptivePortalCnUrls(application)
+        if (resultMsg != null) {
+            appendSwitchFailureLog(
+                action = "CAPTIVE_PORTAL_FIX",
+                subId = null,
+                stage = "apply_cn_urls",
+                backendMessage = resultMsg
+            )
+        }
+        return resultMsg
+    }
+
     /**
      * 重置选中 SIM 卡的配置到运营商默认状态。
      */

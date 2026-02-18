@@ -127,4 +127,8 @@
         android:name="io.github.vvb2060.ims.privileged.ImsResetter"
         android:label="ImsResetter"
         android:targetPackage="${applicationId}" />
+    <instrumentation
+        android:name="io.github.vvb2060.ims.privileged.CaptivePortalFixer"
+        android:label="CaptivePortalFixer"
+        android:targetPackage="${applicationId}" />
 </manifest>
