@@ -101,6 +101,14 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/logcat_filepaths" />
         </provider>
+
+        <receiver
+            android:name="io.github.vvb2060.ims.UpdateInstallReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 
     <instrumentation

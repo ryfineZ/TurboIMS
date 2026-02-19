@@ -109,6 +109,7 @@ import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.vvb2060.ims.BuildConfig
 import io.github.vvb2060.ims.R
+import io.github.vvb2060.ims.UpdateApkCleanup
 import io.github.vvb2060.ims.model.Feature
 import io.github.vvb2060.ims.model.FeatureValue
 import io.github.vvb2060.ims.model.FeatureValueType
@@ -339,6 +340,7 @@ class MainActivity : BaseActivity() {
     private val viewModel: MainViewModel by viewModels()
     private var pendingUpdateDownloadId: Long = -1L
     private var pendingUpdateFileName: String? = null
+    private var pendingUpdateTargetVersion: String? = null
     private var updateReceiverRegistered = false
     private val updateDownloadReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -1203,9 +1205,11 @@ class MainActivity : BaseActivity() {
         runCatching {
             pendingUpdateDownloadId = manager.enqueue(request)
             pendingUpdateFileName = fileName
+            pendingUpdateTargetVersion = release.version
         }.onSuccess {
             Toast.makeText(this, R.string.update_download_started, Toast.LENGTH_SHORT).show()
         }.onFailure {
+            pendingUpdateTargetVersion = null
             Toast.makeText(this, R.string.update_download_failed, Toast.LENGTH_LONG).show()
         }
     }
@@ -1273,6 +1277,15 @@ class MainActivity : BaseActivity() {
             .setDataAndType(uri, UPDATE_APK_MIME_TYPE)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        val apkFileName = pendingUpdateFileName
+        if (!apkFileName.isNullOrBlank()) {
+            UpdateApkCleanup.markPendingInstall(
+                context = this,
+                apkFileName = apkFileName,
+                fromVersion = BuildConfig.VERSION_NAME,
+                targetVersion = pendingUpdateTargetVersion
+            )
+        }
         runCatching { startActivity(installIntent) }.onFailure {
             Toast.makeText(this, R.string.update_download_failed, Toast.LENGTH_LONG).show()
         }
