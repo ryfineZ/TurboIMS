@@ -1985,26 +1985,52 @@ private fun buildUpdateApkFileName(version: String): String {
     return "TurboIMS-$sanitized.apk"
 }
 
-private fun parseVersionParts(version: String): List<Int> {
+private data class ParsedVersion(
+    val baseParts: List<Int>,
+    val revisionCode: Int,
+    val channelRank: Int,
+)
+
+private fun parseVersion(version: String): ParsedVersion? {
     val normalized = version.trim().removePrefix("v").removePrefix("V")
-    val numeric = Regex("\\d+(?:\\.\\d+)*").find(normalized)?.value ?: return emptyList()
-    return numeric.split('.').map { it.toIntOrNull() ?: 0 }
+    val baseMatch = Regex("\\d+(?:\\.\\d+){1,2}").find(normalized) ?: return null
+    val baseParts = baseMatch.value.split('.').map { it.toIntOrNull() ?: 0 }
+    val suffix = normalized.substring(baseMatch.range.last + 1)
+    val channelMatch = Regex("(?:^|[._-])([rRdD])(\\d+)").find(suffix)
+    val channel = channelMatch?.groupValues?.getOrNull(1)?.lowercase(Locale.US)
+    val revisionCode = channelMatch?.groupValues?.getOrNull(2)?.toIntOrNull() ?: 0
+    val channelRank = when (channel) {
+        "r" -> 2
+        "d" -> 1
+        else -> 0
+    }
+    return ParsedVersion(baseParts, revisionCode, channelRank)
+}
+
+private fun compareVersionParts(left: List<Int>, right: List<Int>): Int {
+    val maxSize = maxOf(left.size, right.size)
+    for (index in 0 until maxSize) {
+        val l = left.getOrElse(index) { 0 }
+        val r = right.getOrElse(index) { 0 }
+        if (l != r) return l.compareTo(r)
+    }
+    return 0
 }
 
 private fun isVersionNewer(latest: String, current: String): Boolean {
-    val latestParts = parseVersionParts(latest)
-    val currentParts = parseVersionParts(current)
-    if (latestParts.isEmpty() || currentParts.isEmpty()) {
-        return latest != current
+    val latestVersion = parseVersion(latest)
+    val currentVersion = parseVersion(current)
+    if (latestVersion == null || currentVersion == null) {
+        return latest.trim() != current.trim()
     }
-    val maxSize = maxOf(latestParts.size, currentParts.size)
-    for (index in 0 until maxSize) {
-        val l = latestParts.getOrElse(index) { 0 }
-        val c = currentParts.getOrElse(index) { 0 }
-        if (l > c) return true
-        if (l < c) return false
+    val baseCompare = compareVersionParts(latestVersion.baseParts, currentVersion.baseParts)
+    if (baseCompare != 0) {
+        return baseCompare > 0
     }
-    return false
+    if (latestVersion.revisionCode != currentVersion.revisionCode) {
+        return latestVersion.revisionCode > currentVersion.revisionCode
+    }
+    return latestVersion.channelRank > currentVersion.channelRank
 }
 
 private fun normalizeCountryIso(value: String): String {
