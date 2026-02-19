@@ -144,6 +144,7 @@ private const val ALIPAY_DONATION_URL = "https://qr.alipay.com/2m610390t3ynw5ypk
 private const val ALIPAY_SCAN_QR_ACTIVITY =
     "com.alipay.mobile.quinox.splash.ShareScanQRDispenseActivity"
 private const val DONATION_QR_MIME_TYPE = "image/png"
+private val VERSION_DISPLAY_WITH_REV_REGEX = Regex("""\d+\.\d+\.\d+\.[rd]\d+""")
 private val VERSION_DISPLAY_REGEX = Regex("""\d+\.\d+\.\d+""")
 
 private data class ReleaseInfo(
@@ -218,7 +219,10 @@ private fun isChinaDomesticSim(sim: SimSelection?): Boolean {
 private fun toDisplayVersion(rawVersion: String?): String {
     val text = rawVersion?.trim().orEmpty()
     if (text.isBlank()) return ""
-    return VERSION_DISPLAY_REGEX.find(text)?.value ?: text.removePrefix("v")
+    val normalized = text.removePrefix("v")
+    return VERSION_DISPLAY_WITH_REV_REGEX.find(normalized)?.value
+        ?: VERSION_DISPLAY_REGEX.find(normalized)?.value
+        ?: normalized
 }
 
 private fun defaultFeatureValue(feature: Feature): FeatureValue {
