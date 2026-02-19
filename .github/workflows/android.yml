@@ -41,7 +41,7 @@ jobs:
         versionName=$(cat "app/build/outputs/apk/release/output-metadata.json" | jq -r '.elements[0].versionName')
         versionCode=$(cat "app/build/outputs/apk/release/output-metadata.json" | jq -r '.elements[0].versionCode')
         mkdir outputs
-        mv "app/build/outputs/apk/release/app-release.apk" "outputs/TurbolIms.apk"
+        mv "app/build/outputs/apk/release/app-release.apk" "outputs/CarrierIMSForPixel.apk"
         echo "versionName=$versionName" >> $GITHUB_OUTPUT
         echo "versionCode=$versionCode" >> $GITHUB_OUTPUT
     - name: Release
@@ -50,4 +50,4 @@ jobs:
         tag_name: ${{ steps.apk.outputs.versionName }}
         body_path: CHANGELOG.md
         files: |
-          outputs/TurbolIms.apk
+          outputs/CarrierIMSForPixel.apk
