@@ -97,6 +97,14 @@ SIGN_KEY_PASSWORD=***
 - TikTok fix switch only appears for Mainland SIM
 - restart target app or refresh its session after changes
 
+### Why "country code modification" was removed and replaced by "TikTok one-tap fix"
+
+- The old "country code" flow only wrote CarrierConfig override `sim_country_iso_override_string`; it did not truly modify baseband-level MCC/MNC.
+- Real network identity values (for example `gsm.operator.numeric` and registered MCC/MNC) are usually not changed by this override, so it is not a stable or universal "change country code" method.
+- In practice, TikTok availability was not determined by "switching to another country", but by setting ISO to an abnormal value, which could trigger an app-side identification fallback path and bypass part of SIM-region checks.
+- Based on this actual behavior, the project changed the entry to a clearer switch: "Fix TikTok No Network", to avoid implying that the app can truly rewrite carrier identity.
+- This behavior depends on target app versions and risk-control policy, and may change over time. It is provided for compatibility troubleshooting and testing only.
+
 ## Changelog
 
 - Full changelog: [CHANGELOG.md](CHANGELOG.md)
