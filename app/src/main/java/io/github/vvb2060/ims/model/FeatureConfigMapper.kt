@@ -106,8 +106,8 @@ object FeatureConfigMapper {
         )
 
         val arr = bundle.getIntArray(CarrierConfigManager.KEY_CARRIER_NR_AVAILABILITIES_INT_ARRAY)
-        val nrEnabled = arr?.contains(CarrierConfigManager.CARRIER_NR_AVAILABILITY_NSA) == true &&
-            arr.contains(CarrierConfigManager.CARRIER_NR_AVAILABILITY_SA)
+        val nrEnabled = arr?.contains(CarrierConfigManager.CARRIER_NR_AVAILABILITY_NSA) == true ||
+            arr?.contains(CarrierConfigManager.CARRIER_NR_AVAILABILITY_SA) == true
         map[Feature.FIVE_G_NR] = FeatureValue(nrEnabled, FeatureValueType.BOOLEAN)
 
         val thresholds = bundle.getIntArray(CarrierConfigManager.KEY_5G_NR_SSRSRP_THRESHOLDS_INT_ARRAY)

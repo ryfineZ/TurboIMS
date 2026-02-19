@@ -62,6 +62,8 @@ import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LocalMinimumInteractiveComponentEnforcement
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -71,9 +73,11 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -88,13 +92,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -106,8 +115,11 @@ import io.github.vvb2060.ims.model.FeatureValueType
 import io.github.vvb2060.ims.model.ShizukuStatus
 import io.github.vvb2060.ims.model.SimSelection
 import io.github.vvb2060.ims.model.SystemInfo
+import io.github.vvb2060.ims.privileged.ImsModifier
 import io.github.vvb2060.ims.viewmodel.MainViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -132,6 +144,7 @@ private const val ALIPAY_DONATION_URL = "https://qr.alipay.com/2m610390t3ynw5ypk
 private const val ALIPAY_SCAN_QR_ACTIVITY =
     "com.alipay.mobile.quinox.splash.ShareScanQRDispenseActivity"
 private const val DONATION_QR_MIME_TYPE = "image/png"
+private val VERSION_DISPLAY_REGEX = Regex("""\d+\.\d+\.\d+""")
 
 private data class ReleaseInfo(
     val version: String,
@@ -202,6 +215,12 @@ private fun isChinaDomesticSim(sim: SimSelection?): Boolean {
     return mcc == "460"
 }
 
+private fun toDisplayVersion(rawVersion: String?): String {
+    val text = rawVersion?.trim().orEmpty()
+    if (text.isBlank()) return ""
+    return VERSION_DISPLAY_REGEX.find(text)?.value ?: text.removePrefix("v")
+}
+
 private fun defaultFeatureValue(feature: Feature): FeatureValue {
     return FeatureValue(feature.defaultValue, feature.valueType)
 }
@@ -249,6 +268,69 @@ private fun buildIssueBody(
     }.trim()
 }
 
+private fun dumpValueText(value: Any?): String {
+    return when (value) {
+        null -> "null"
+        is IntArray -> value.joinToString(prefix = "[", postfix = "]")
+        is LongArray -> value.joinToString(prefix = "[", postfix = "]")
+        is DoubleArray -> value.joinToString(prefix = "[", postfix = "]")
+        is BooleanArray -> value.joinToString(prefix = "[", postfix = "]")
+        is Array<*> -> value.joinToString(prefix = "[", postfix = "]")
+        else -> value.toString()
+    }
+}
+
+private fun buildEditableConfigSnapshotText(
+    selectedSim: SimSelection,
+    featureMap: Map<Feature, FeatureValue>,
+    countryMccInput: String,
+    resolvedCountryIsoForApply: String?,
+    bundleForApply: Bundle,
+    captivePortalState: MainViewModel.CaptivePortalFixState?,
+): String {
+    val sortedBundleKeys = bundleForApply.keySet().sorted()
+    return buildString {
+        appendLine("[selected_sim]")
+        appendLine("sim.show_title=${selectedSim.showTitle}")
+        appendLine("sim.sub_id=${selectedSim.subId}")
+        appendLine("sim.slot_index=${selectedSim.simSlotIndex}")
+        appendLine("sim.current_mcc=${selectedSim.mcc}")
+        appendLine("sim.current_mnc=${selectedSim.mnc}")
+        appendLine("sim.current_iso=${selectedSim.countryIso}")
+        appendLine()
+
+        appendLine("[feature_inputs]")
+        Feature.entries.forEach { feature ->
+            val value = featureMap[feature]?.data ?: feature.defaultValue
+            appendLine("feature.${feature.name.lowercase(Locale.US)}=${dumpValueText(value)}")
+        }
+        appendLine("input.country_mcc=$countryMccInput")
+        appendLine("apply.country_iso_resolved=${resolvedCountryIsoForApply ?: ""}")
+        appendLine()
+
+        appendLine("[carrier_config_bundle_for_apply]")
+        if (sortedBundleKeys.isEmpty()) {
+            appendLine("(empty)")
+        } else {
+            sortedBundleKeys.forEach { key ->
+                appendLine("$key=${dumpValueText(bundleForApply.get(key))}")
+            }
+        }
+        appendLine()
+
+        appendLine("[network_verification]")
+        if (captivePortalState == null) {
+            appendLine("captive_portal.mode=unknown")
+            appendLine("captive_portal.http_url=")
+            appendLine("captive_portal.https_url=")
+        } else {
+            appendLine("captive_portal.mode=${captivePortalState.mode}")
+            appendLine("captive_portal.http_url=${captivePortalState.httpUrl}")
+            appendLine("captive_portal.https_url=${captivePortalState.httpsUrl}")
+        }
+    }.trim()
+}
+
 class MainActivity : BaseActivity() {
     private val viewModel: MainViewModel by viewModels()
     private var pendingUpdateDownloadId: Long = -1L
@@ -290,12 +372,18 @@ class MainActivity : BaseActivity() {
         val imsRegistrationLoadingMap = remember { mutableStateMapOf<Int, Boolean>() }
         var applyingConfiguration by remember { mutableStateOf(false) }
         var checkingUpdate by remember { mutableStateOf(false) }
+        var hasUpdateAvailable by remember { mutableStateOf(false) }
+        var latestAvailableVersion by remember { mutableStateOf<String?>(null) }
         var fixingCaptivePortal by remember { mutableStateOf(false) }
         var checkingCaptivePortalStatus by remember { mutableStateOf(false) }
         var captivePortalFixState by remember { mutableStateOf<MainViewModel.CaptivePortalFixState?>(null) }
         var updateDialogState by remember { mutableStateOf<UpdateDialogState?>(null) }
         var showDonationSheet by remember { mutableStateOf(false) }
         var donationFeedbackMessage by remember { mutableStateOf<String?>(null) }
+        var showDiagnosticsDialog by remember { mutableStateOf(false) }
+        var diagnosticsRunning by remember { mutableStateOf(false) }
+        var diagnosticsJob by remember { mutableStateOf<Job?>(null) }
+        val diagnosticsLines = remember { mutableStateListOf<String>() }
         val featureSwitches = remember { mutableStateMapOf<Feature, FeatureValue>() }
         val committedFeatureSwitches = remember { mutableStateMapOf<Feature, FeatureValue>() }
         val countryMccDraftBySubId = remember { mutableStateMapOf<Int, String>() }
@@ -331,6 +419,16 @@ class MainActivity : BaseActivity() {
                 checkingCaptivePortalStatus = false
                 captivePortalFixState = null
             }
+        }
+        LaunchedEffect(Unit) {
+            if (checkingUpdate) return@LaunchedEffect
+            checkingUpdate = true
+            val currentVersion = BuildConfig.VERSION_NAME
+            val result = fetchLatestReleaseInfo()
+            checkingUpdate = false
+            val release = result.getOrNull()
+            hasUpdateAvailable = release != null && isVersionNewer(release.version, currentVersion)
+            latestAvailableVersion = if (hasUpdateAvailable) release?.version else null
         }
         LaunchedEffect(allSimList) {
             val validSubIds = allSimList.filter { it.subId >= 0 }.map { it.subId }.toSet()
@@ -445,6 +543,8 @@ class MainActivity : BaseActivity() {
                     onRequestShizukuPermission = {
                         viewModel.requestShizukuPermission(0)
                     },
+                    hasUpdateAvailable = hasUpdateAvailable,
+                    latestAvailableVersion = latestAvailableVersion,
                     onLogcatClick = {
                         startActivity(
                             Intent(
@@ -464,6 +564,8 @@ class MainActivity : BaseActivity() {
                             checkingUpdate = false
                             val release = result.getOrNull()
                             if (release == null) {
+                                hasUpdateAvailable = false
+                                latestAvailableVersion = null
                                 Toast.makeText(
                                     context,
                                     this@MainActivity.getString(
@@ -475,9 +577,13 @@ class MainActivity : BaseActivity() {
                                 return@launch
                             }
                             if (!isVersionNewer(release.version, currentVersion)) {
+                                hasUpdateAvailable = false
+                                latestAvailableVersion = null
                                 Toast.makeText(context, R.string.update_latest, Toast.LENGTH_SHORT).show()
                                 return@launch
                             }
+                            hasUpdateAvailable = true
+                            latestAvailableVersion = release.version
                             updateDialogState = UpdateDialogState(
                                 currentVersion = currentVersion,
                                 latest = release
@@ -799,13 +905,79 @@ class MainActivity : BaseActivity() {
                                 Toast.makeText(context, R.string.select_single_sim, Toast.LENGTH_SHORT).show()
                                 return@FeaturesCard
                             }
-                            startActivity(
-                                Intent(
-                                    this@MainActivity,
-                                    DumpActivity::class.java
-                                ).putExtra(DumpActivity.EXTRA_SUB_ID, sim.subId)
-                            )
-                        }
+                            scope.launch {
+                                val mapToDump = buildCompleteFeatureMap(featureSwitches)
+                                val resolvedCountryIso = viewModel.resolveCountryIsoOverridePreview(sim, mapToDump)
+                                val bundleForApply = ImsModifier.buildBundle(
+                                    carrierName = null,
+                                    countryISO = resolvedCountryIso,
+                                    countryMcc = null,
+                                    countryMncHint = sim.mnc,
+                                    enableVoLTE = (mapToDump[Feature.VOLTE]?.data ?: true) as Boolean,
+                                    enableVoWiFi = (mapToDump[Feature.VOWIFI]?.data ?: true) as Boolean,
+                                    enableVT = (mapToDump[Feature.VT]?.data ?: true) as Boolean,
+                                    enableVoNR = (mapToDump[Feature.VONR]?.data ?: true) as Boolean,
+                                    enableCrossSIM = (mapToDump[Feature.CROSS_SIM]?.data ?: true) as Boolean,
+                                    enableUT = (mapToDump[Feature.UT]?.data ?: true) as Boolean,
+                                    enable5GNR = (mapToDump[Feature.FIVE_G_NR]?.data ?: true) as Boolean,
+                                    enable5GThreshold = (mapToDump[Feature.FIVE_G_THRESHOLDS]?.data ?: true) as Boolean,
+                                    enable5GPlusIcon = (mapToDump[Feature.FIVE_G_PLUS_ICON]?.data ?: true) as Boolean,
+                                    enableShow4GForLTE = (mapToDump[Feature.SHOW_4G_FOR_LTE]?.data ?: false) as Boolean,
+                                )
+                                val snapshotText = buildEditableConfigSnapshotText(
+                                    selectedSim = sim,
+                                    featureMap = mapToDump,
+                                    countryMccInput = countryMccDraftBySubId[sim.subId].orEmpty(),
+                                    resolvedCountryIsoForApply = resolvedCountryIso,
+                                    bundleForApply = bundleForApply,
+                                    captivePortalState = captivePortalFixState ?: viewModel.queryCaptivePortalFixState(),
+                                )
+                                startActivity(
+                                    Intent(
+                                        this@MainActivity,
+                                        DumpActivity::class.java
+                                    )
+                                        .putExtra(DumpActivity.EXTRA_SUB_ID, sim.subId)
+                                        .putExtra(DumpActivity.EXTRA_PRESET_TEXT, snapshotText)
+                                )
+                            }
+                        },
+                        onRunDiagnostics = {
+                            val sim = selectedSim
+                            if (sim == null || sim.subId < 0) {
+                                Toast.makeText(context, R.string.select_single_sim, Toast.LENGTH_SHORT).show()
+                                return@FeaturesCard
+                            }
+                            if (shizukuStatus != ShizukuStatus.READY) {
+                                Toast.makeText(context, R.string.shizuku_not_running_msg, Toast.LENGTH_LONG).show()
+                                return@FeaturesCard
+                            }
+                            diagnosticsJob?.cancel()
+                            diagnosticsLines.clear()
+                            showDiagnosticsDialog = true
+                            diagnosticsRunning = true
+                            diagnosticsJob = scope.launch {
+                                try {
+                                    val appMapSnapshot = buildCompleteFeatureMap(featureSwitches)
+                                    viewModel.runShizukuDiagnostics(
+                                        selectedSim = sim,
+                                        visibleSimList = allSimList,
+                                        appFeatureMap = appMapSnapshot
+                                    ).collect { line ->
+                                        diagnosticsLines.add(line)
+                                    }
+                                } catch (t: Throwable) {
+                                    diagnosticsLines.add("❌ 诊断异常：${t.javaClass.simpleName} (${t.message ?: "unknown"})")
+                                    Toast.makeText(
+                                        context,
+                                        R.string.diagnostics_failed,
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                } finally {
+                                    diagnosticsRunning = false
+                                }
+                            }
+                        },
                     )
                 }
                 if (issueFailureLogs.isNotBlank()) {
@@ -926,6 +1098,83 @@ class MainActivity : BaseActivity() {
                         confirmButton = {
                             TextButton(onClick = { donationFeedbackMessage = null }) {
                                 Text(stringResource(id = android.R.string.ok))
+                            }
+                        }
+                    )
+                }
+                if (showDiagnosticsDialog) {
+                    AlertDialog(
+                        modifier = Modifier.fillMaxWidth(0.96f),
+                        properties = DialogProperties(usePlatformDefaultWidth = false),
+                        onDismissRequest = {
+                            diagnosticsJob?.cancel()
+                            diagnosticsRunning = false
+                            showDiagnosticsDialog = false
+                        },
+                        title = {
+                            Text(stringResource(R.string.diagnostics_menu))
+                        },
+                        text = {
+                            Column(
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = stringResource(
+                                        if (diagnosticsRunning) {
+                                            R.string.diagnostics_running
+                                        } else {
+                                            R.string.diagnostics_finished
+                                        }
+                                    ),
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                                if (diagnosticsRunning) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                                }
+                                Spacer(modifier = Modifier.height(10.dp))
+                                val logText = diagnosticsLines.joinToString("\n")
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 220.dp, max = 480.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+                                        .padding(10.dp)
+                                        .verticalScroll(rememberScrollState())
+                                ) {
+                                    Text(
+                                        text = logText.ifBlank { stringResource(R.string.diagnostics_empty) },
+                                        fontSize = 12.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(
+                                enabled = diagnosticsLines.isNotEmpty(),
+                                onClick = {
+                                    val content = diagnosticsLines.joinToString("\n")
+                                    clipboardManager?.setPrimaryClip(
+                                        ClipData.newPlainText("carrier_ims_diagnostics", content)
+                                    )
+                                    Toast.makeText(context, R.string.dump_copy_success, Toast.LENGTH_SHORT).show()
+                                }
+                            ) {
+                                Text(stringResource(R.string.dump_copy))
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(
+                                onClick = {
+                                    diagnosticsJob?.cancel()
+                                    diagnosticsRunning = false
+                                    showDiagnosticsDialog = false
+                                }
+                            ) {
+                                Text(stringResource(id = android.R.string.cancel))
                             }
                         }
                     )
@@ -1098,6 +1347,8 @@ fun SystemInfoCard(
     onRefresh: () -> Unit,
     onRequestShizukuPermission: () -> Unit,
     checkingUpdate: Boolean,
+    hasUpdateAvailable: Boolean,
+    latestAvailableVersion: String?,
     onCheckUpdate: () -> Unit,
     onLogcatClick: () -> Unit,
     onIssueClick: () -> Unit,
@@ -1122,7 +1373,7 @@ fun SystemInfoCard(
             .fillMaxWidth()
             .padding(16.dp),
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
             BrandHeader()
             Spacer(modifier = Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1147,8 +1398,20 @@ fun SystemInfoCard(
                         onClick = onIssueClick,
                     )
                     HeaderActionChip(
-                        icon = painterResource(R.drawable.ic_update),
-                        label = stringResource(R.string.action_update),
+                        icon = painterResource(
+                            if (hasUpdateAvailable) {
+                                R.drawable.ic_update_available
+                            } else {
+                                R.drawable.ic_update
+                            }
+                        ),
+                        label = stringResource(
+                            if (hasUpdateAvailable) {
+                                R.string.action_update_available
+                            } else {
+                                R.string.action_update
+                            }
+                        ),
                         enabled = !checkingUpdate,
                         onClick = onCheckUpdate,
                     )
@@ -1159,10 +1422,26 @@ fun SystemInfoCard(
                     )
                 }
             }
-            Text(
-                stringResource(R.string.app_version, systemInfo.appVersionName),
-                fontSize = 14.sp,
-            )
+            val versionAnnotated = buildAnnotatedString {
+                append(stringResource(R.string.current_version, toDisplayVersion(systemInfo.appVersionName)))
+                if (hasUpdateAvailable && !latestAvailableVersion.isNullOrBlank()) {
+                    append(" · ")
+                    withStyle(
+                        SpanStyle(
+                            color = Color(0xFF16A34A),
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    ) {
+                        append(
+                            stringResource(
+                                R.string.update_available_inline,
+                                toDisplayVersion(latestAvailableVersion)
+                            )
+                        )
+                    }
+                }
+            }
+            Text(text = versionAnnotated, fontSize = 14.sp)
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 stringResource(R.string.device_model, systemInfo.deviceModel),
@@ -1178,7 +1457,7 @@ fun SystemInfoCard(
                 stringResource(R.string.security_patch_version, systemInfo.securityPatchVersion),
                 fontSize = 14.sp,
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -1202,14 +1481,8 @@ fun SystemInfoCard(
                     Text(text = stringResource(id = R.string.request_permission))
                 }
             }
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             HorizontalDivider(thickness = 0.5.dp)
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = stringResource(R.string.donation_support_desc),
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.outline
-            )
             Spacer(modifier = Modifier.height(8.dp))
             Button(
                 onClick = onDonateClick,
@@ -1240,7 +1513,7 @@ private fun BrandHeader() {
         Image(
             painter = painterResource(id = R.drawable.ic_launcher_foreground),
             contentDescription = null,
-            modifier = Modifier.size(36.dp),
+            modifier = Modifier.size(48.dp),
             contentScale = ContentScale.Fit
         )
         Column(
@@ -1276,7 +1549,7 @@ fun CaptivePortalFixCard(
             .padding(horizontal = 16.dp)
             .padding(bottom = 16.dp),
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
             Text(
                 text = stringResource(R.string.captive_portal_fix_title),
                 fontSize = 18.sp,
@@ -1393,7 +1666,7 @@ fun SimCardSelectionCard(
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -1410,20 +1683,25 @@ fun SimCardSelectionCard(
                     onClick = onRefreshSimList,
                 )
             }
-            Column {
-                allSimList.forEach { sim ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .selectable(
+            CompositionLocalProvider(LocalMinimumInteractiveComponentEnforcement provides false) {
+                Column {
+                    allSimList.forEach { sim ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 36.dp)
+                                .selectable(
+                                    selected = (selectedSim == sim),
+                                    onClick = { onSelectSim(sim) }),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                modifier = Modifier.size(20.dp),
                                 selected = (selectedSim == sim),
-                                onClick = { onSelectSim(sim) }),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = (selectedSim == sim),
-                            onClick = { onSelectSim(sim) })
-                        Text(sim.showTitle)
+                                onClick = { onSelectSim(sim) })
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(sim.showTitle)
+                        }
                     }
                 }
             }
@@ -1452,13 +1730,14 @@ fun FeaturesCard(
     onTextFeatureCommit: (Feature) -> Unit,
     resetFeatures: () -> Unit,
     onDumpConfig: () -> Unit,
+    onRunDiagnostics: () -> Unit,
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp),
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
             var featureMenuExpanded by remember(isSelectAllSim, selectedSim?.subId) { mutableStateOf(false) }
             var showRestoreConfirmDialog by remember(isSelectAllSim, selectedSim?.subId) {
                 mutableStateOf(false)
@@ -1500,6 +1779,13 @@ fun FeaturesCard(
                                 onClick = {
                                     featureMenuExpanded = false
                                     onDumpConfig()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.diagnostics_menu)) },
+                                onClick = {
+                                    featureMenuExpanded = false
+                                    onRunDiagnostics()
                                 }
                             )
                         }

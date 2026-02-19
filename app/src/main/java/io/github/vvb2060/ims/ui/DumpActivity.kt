@@ -51,10 +51,15 @@ class DumpActivity : BaseActivity() {
         val clipboardManager = LocalClipboardManager.current
         val state by viewModel.uiState.collectAsStateWithLifecycle()
         val subId = intent.getIntExtra(EXTRA_SUB_ID, -1)
+        val presetText = intent.getStringExtra(EXTRA_PRESET_TEXT).orEmpty()
+        val usingPresetText = presetText.isNotBlank()
+        val displayText = if (usingPresetText) presetText else state.text
         var filterText by remember { mutableStateOf("") }
 
-        LaunchedEffect(subId) {
-            viewModel.loadDump(subId)
+        LaunchedEffect(subId, presetText) {
+            if (!usingPresetText) {
+                viewModel.loadDump(subId)
+            }
         }
 
         val scrollBehavior =
@@ -67,10 +72,10 @@ class DumpActivity : BaseActivity() {
                     title = { Text(stringResource(id = R.string.dump_title)) },
                     scrollBehavior = scrollBehavior,
                     actions = {
-                        if (state.text.isNotBlank()) {
+                        if (displayText.isNotBlank()) {
                             IconButton(
                                 onClick = {
-                                    clipboardManager.setText(AnnotatedString(state.text))
+                                    clipboardManager.setText(AnnotatedString(displayText))
                                     Toast.makeText(context, R.string.dump_copy_success, Toast.LENGTH_SHORT).show()
                                 }
                             ) {
@@ -88,6 +93,35 @@ class DumpActivity : BaseActivity() {
                     .windowInsetsPadding(WindowInsets.statusBars)
             ) {
                 when {
+                    usingPresetText -> {
+                        val filteredText = if (filterText.isBlank()) {
+                            displayText
+                        } else {
+                            displayText
+                                .lineSequence()
+                                .filter { it.contains(filterText, ignoreCase = true) }
+                                .joinToString("\n")
+                        }
+                        Column(
+                            modifier = Modifier
+                                .padding(16.dp)
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            OutlinedTextField(
+                                value = filterText,
+                                onValueChange = { filterText = it },
+                                label = { Text(stringResource(id = R.string.dump_filter_label)) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = filteredText,
+                                fontFamily = FontFamily.Monospace,
+                            )
+                        }
+                    }
+
                     state.loading -> {
                         Text(
                             text = stringResource(id = R.string.dump_loading),
@@ -139,5 +173,6 @@ class DumpActivity : BaseActivity() {
 
     companion object {
         const val EXTRA_SUB_ID = "extra_sub_id"
+        const val EXTRA_PRESET_TEXT = "extra_preset_text"
     }
 }

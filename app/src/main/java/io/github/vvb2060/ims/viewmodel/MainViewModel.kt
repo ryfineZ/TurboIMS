@@ -4,9 +4,11 @@ import android.app.Application
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.os.Bundle
 import android.os.Build
 import android.provider.Settings
 import android.telephony.SubscriptionManager
+import android.telephony.TelephonyManager
 import android.util.Log
 import android.widget.Toast
 import androidx.core.content.edit
@@ -33,8 +35,10 @@ import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -105,6 +109,10 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
         return raw.trim().lowercase(Locale.US).filter { it.isLetterOrDigit() }.take(8)
     }
 
+    private fun nowShortTime(): String {
+        return SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
+    }
+
     private fun isChinaDomesticSim(selectedSim: SimSelection): Boolean {
         val iccId = selectedSim.iccId.trim()
         if (iccId.startsWith("8986")) return true
@@ -164,6 +172,15 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
             return linkedIso
         }
         return loadOrCreateTikTokRandomIso(selectedSim.subId)
+    }
+
+    fun resolveCountryIsoOverridePreview(
+        selectedSim: SimSelection,
+        map: Map<Feature, FeatureValue>,
+    ): String? {
+        if (selectedSim.subId < 0) return null
+        val enableTikTokFix = (map[Feature.TIKTOK_NETWORK_FIX]?.data as? Boolean) == true
+        return resolveCountryIsoOverrideForApply(selectedSim, enableTikTokFix)
     }
 
     // 系统信息状态流
@@ -591,6 +608,195 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
         }
         toast(application.getString(R.string.config_failed, resultMsg), false)
         return false
+    }
+
+    fun runShizukuDiagnostics(
+        selectedSim: SimSelection,
+        visibleSimList: List<SimSelection>,
+        appFeatureMap: Map<Feature, FeatureValue>,
+    ): Flow<String> = flow {
+        suspend fun emitLine(line: String) {
+            emit("[${nowShortTime()}] $line")
+        }
+
+        fun formatSimHeadline(sim: SimSelection): String {
+            val iccTail = sim.iccId.takeLast(4).ifBlank { "----" }
+            return "${sim.showTitle} | subId=${sim.subId} | ICCID尾号=$iccTail"
+        }
+
+        fun toOnOff(value: Boolean?): String {
+            return when (value) {
+                true -> "ON"
+                false -> "OFF"
+                null -> "N/A"
+            }
+        }
+
+        fun resolvePortalModeTag(httpUrl: String, httpsUrl: String): String {
+            val lowerHttp = httpUrl.lowercase(Locale.ROOT)
+            val lowerHttps = httpsUrl.lowercase(Locale.ROOT)
+            return if (lowerHttp.contains(".cn/") || lowerHttps.contains(".cn/")) "cn" else "com"
+        }
+
+        fun networkTypeName(type: Int): String {
+            return when (type) {
+                TelephonyManager.NETWORK_TYPE_NR -> "NR(5G)"
+                TelephonyManager.NETWORK_TYPE_LTE -> "LTE(4G)"
+                19 -> "LTE_CA(4G+)"
+                TelephonyManager.NETWORK_TYPE_HSPAP -> "HSPA+"
+                TelephonyManager.NETWORK_TYPE_HSPA -> "HSPA"
+                TelephonyManager.NETWORK_TYPE_HSUPA -> "HSUPA"
+                TelephonyManager.NETWORK_TYPE_HSDPA -> "HSDPA"
+                TelephonyManager.NETWORK_TYPE_UMTS -> "UMTS(3G)"
+                TelephonyManager.NETWORK_TYPE_EDGE -> "EDGE(2G)"
+                TelephonyManager.NETWORK_TYPE_GPRS -> "GPRS(2G)"
+                TelephonyManager.NETWORK_TYPE_GSM -> "GSM(2G)"
+                TelephonyManager.NETWORK_TYPE_CDMA -> "CDMA"
+                TelephonyManager.NETWORK_TYPE_EVDO_0 -> "EVDO_0"
+                TelephonyManager.NETWORK_TYPE_EVDO_A -> "EVDO_A"
+                TelephonyManager.NETWORK_TYPE_EVDO_B -> "EVDO_B"
+                TelephonyManager.NETWORK_TYPE_1xRTT -> "1xRTT"
+                TelephonyManager.NETWORK_TYPE_IWLAN -> "IWLAN"
+                TelephonyManager.NETWORK_TYPE_UNKNOWN -> "UNKNOWN"
+                else -> "TYPE_$type"
+            }
+        }
+
+        emitLine("=== 开始诊断：运营商/IMS 网络能力 ===")
+        emitLine(formatSimHeadline(selectedSim))
+
+        val binderReady = Shizuku.pingBinder()
+        val permissionGranted = Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+        emitLine("[1/8] Shizuku 检查: binder=${if (binderReady) "已连接" else "未连接"}, permission=${if (permissionGranted) "已授权" else "未授权"}")
+        if (!binderReady || !permissionGranted) {
+            emitLine("❌ 诊断中止：Shizuku 未就绪。")
+            emitLine("=== 诊断结束 ===")
+            return@flow
+        }
+
+        val realSims = visibleSimList.filter { it.subId >= 0 }
+        emitLine("[2/8] SIM 拓扑: 检测到 ${realSims.size} 张可用 SIM")
+        realSims.forEach { sim ->
+            emitLine(
+                "- ${formatSimHeadline(sim)} | MCC/MNC=${sim.mcc}/${sim.mnc}, ISO=${sim.countryIso.ifBlank { "-" }}"
+            )
+        }
+
+        emitLine("[3/8] IMS 注册状态检测")
+        val imsStatusBySubId = linkedMapOf<Int, Boolean?>()
+        realSims.forEach { sim ->
+            val status = runCatching { readImsRegistrationStatus(sim.subId) }.getOrNull()
+            imsStatusBySubId[sim.subId] = status
+            val text = when (status) {
+                true -> "已注册"
+                false -> "未注册"
+                null -> "读取失败/未知"
+            }
+            emitLine("- subId=${sim.subId}: IMS $text")
+        }
+
+        emitLine("[4/8] CarrierConfig 关键能力读取 (目标 SIM)")
+        val keyToLabel = linkedMapOf(
+            "carrier_volte_available_bool" to "VoLTE",
+            "carrier_wfc_ims_available_bool" to "VoWiFi",
+            "carrier_vt_available_bool" to "ViLTE 视频通话",
+            "carrier_supports_ss_over_ut_bool" to "UT补充服务",
+            "carrier_cross_sim_ims_available_bool" to "跨SIM通话",
+            "enable_cross_sim_calling_on_opportunistic_data_bool" to "机会数据跨 SIM 通话",
+            "vonr_enabled_bool" to "VoNR",
+            "vonr_setting_visibility_bool" to "VoNR 开关可见",
+            "sim_country_iso_override_string" to "SIM ISO 覆盖",
+        )
+        val diagReadKeys = linkedSetOf<String>().apply {
+            addAll(keyToLabel.keys)
+            addAll(FeatureConfigMapper.readKeys)
+        }.toTypedArray()
+        val configBundle = runCatching {
+            ShizukuProvider.readCarrierConfig(
+                application,
+                selectedSim.subId,
+                diagReadKeys
+            )
+        }.getOrNull()
+        if (configBundle == null) {
+            emitLine("❌ 读取 CarrierConfig 失败")
+        } else {
+            keyToLabel.forEach { (key, label) ->
+                val value = when {
+                    configBundle.containsKey(key) -> configBundle.get(key)
+                    else -> null
+                }
+                emitLine("- $label ($key) = ${value ?: "N/A"}")
+            }
+        }
+
+        emitLine("[5/8] 实时网络状态 (目标 SIM)")
+        val telephony = application.getSystemService(TelephonyManager::class.java)
+            ?.createForSubscriptionId(selectedSim.subId)
+        val dataTypeResult = runCatching {
+            telephony?.dataNetworkType ?: TelephonyManager.NETWORK_TYPE_UNKNOWN
+        }
+        val voiceTypeResult = runCatching {
+            telephony?.voiceNetworkType ?: TelephonyManager.NETWORK_TYPE_UNKNOWN
+        }
+        val dataType = dataTypeResult.getOrDefault(TelephonyManager.NETWORK_TYPE_UNKNOWN)
+        val voiceType = voiceTypeResult.getOrDefault(TelephonyManager.NETWORK_TYPE_UNKNOWN)
+        val realtime5g = dataType == TelephonyManager.NETWORK_TYPE_NR ||
+            voiceType == TelephonyManager.NETWORK_TYPE_NR
+        emitLine("- 当前数据制式 = ${networkTypeName(dataType)}")
+        emitLine("- 当前语音制式 = ${networkTypeName(voiceType)}")
+        emitLine("- 实时 5G 状态 = ${if (realtime5g) "ON" else "OFF"}")
+        val realtimeReadError = dataTypeResult.exceptionOrNull() ?: voiceTypeResult.exceptionOrNull()
+        if (realtimeReadError != null) {
+            emitLine("- 实时网络读取受限: ${realtimeReadError.javaClass.simpleName} (${realtimeReadError.message ?: "no message"})")
+        }
+        emitLine("- 说明：实时驻网状态与 CarrierConfig 开关不是同一层含义。")
+
+        emitLine("[6/8] App 开关值 vs CarrierConfig 读回 (目标 SIM)")
+        if (configBundle == null) {
+            emitLine("❌ 因 CarrierConfig 读取失败，无法映射功能项")
+        } else {
+            val mapped = FeatureConfigMapper.fromBundle(configBundle)
+            val rows = listOf(
+                Feature.VOLTE to "VoLTE",
+                Feature.VOWIFI to "VoWiFi",
+                Feature.VT to "ViLTE",
+                Feature.CROSS_SIM to "跨SIM通话",
+                Feature.UT to "UT补充服务",
+                Feature.VONR to "VoNR",
+                Feature.FIVE_G_NR to "5G NR",
+                Feature.FIVE_G_PLUS_ICON to "5GA/5G+ 图标",
+                Feature.SHOW_4G_FOR_LTE to "LTE显示为4G",
+                Feature.TIKTOK_NETWORK_FIX to "TikTok 修复",
+            )
+            rows.forEach { (feature, label) ->
+                val appEnabled = appFeatureMap[feature]?.data as? Boolean
+                val systemEnabled = mapped[feature]?.data as? Boolean
+                val mismatch = if (appEnabled != null && systemEnabled != null && appEnabled != systemEnabled) " ⚠️不一致" else ""
+                emitLine("- $label | App=${toOnOff(appEnabled)} | CarrierConfig=${toOnOff(systemEnabled)}$mismatch")
+            }
+        }
+
+        emitLine("[7/8] 网络验证与国家码覆盖状态")
+        val captiveState = runCatching { queryCaptivePortalFixState() }.getOrNull()
+        if (captiveState == null) {
+            emitLine("- 网络验证状态读取失败")
+        } else {
+            emitLine("- 网络验证模式 = ${resolvePortalModeTag(captiveState.httpUrl, captiveState.httpsUrl)}")
+            emitLine("- HTTP 验证地址 = ${captiveState.httpUrl}")
+            emitLine("- HTTPS 验证地址 = ${captiveState.httpsUrl}")
+        }
+        val savedMcc = loadSavedCountryMccOverride(selectedSim.subId)
+        emitLine("- 本地保存 MCC 覆盖 = ${savedMcc.ifBlank { "(空)" }}")
+
+        emitLine("[8/8] 结论")
+        val selectedImsStatus = imsStatusBySubId[selectedSim.subId]
+        when (selectedImsStatus) {
+            true -> emitLine("✅ 目标 SIM 当前 IMS 已注册，基础链路正常。")
+            false -> emitLine("⚠️ 目标 SIM 当前 IMS 未注册，建议优先检查 VoLTE/VoWiFi/APN(ims) 与运营商侧开通状态。")
+            null -> emitLine("⚠️ 目标 SIM 的 IMS 状态读取失败，建议重试并检查 Shizuku 授权状态。")
+        }
+        emitLine("=== 诊断结束 ===")
     }
 
     private fun toast(msg: String, short: Boolean = true) {

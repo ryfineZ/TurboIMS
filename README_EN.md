@@ -25,6 +25,11 @@
 
 This project is a continuously maintained branch based on [Mystery00/TurboIMS](https://github.com/Mystery00/TurboIMS), with major usability and compatibility improvements for Mainland China and cross-region use cases.
 
+Recent improvements include:
+
+- network diagnostics with side-by-side App vs CarrierConfig readback
+- denser card layout and tighter spacing for faster operation
+
 ## Screenshots
 
 <p align="center">
@@ -38,7 +43,7 @@ This project is a continuously maintained branch based on [Mystery00/TurboIMS](h
 |---|---|---|
 | System Info | app/device/patch/Shizuku status | quick environment visibility |
 | IMS Registration | status query + manual register | one-tap register workflow |
-| Carrier Features | VoLTE / VoWiFi / VT / VoNR / UT / Cross-SIM | realtime switches, rollback on failure |
+| Carrier Features | VoLTE / VoWiFi / ViLTE / VoNR / UT / Cross-SIM | realtime switches, rollback on failure |
 | 5G Features | 5G NR / 5G signal threshold / 5G+ icon | optimized for common CN scenarios |
 | Network Fix | captive portal one-tap fix | fixes restricted/exclamation network states |
 | TikTok Fix | no-network fix for TikTok (Mainland SIM) | shown only for Mainland SIM |
