@@ -140,12 +140,10 @@ class MainViewModel(private val application: Application) : AndroidViewModel(app
 
     private fun loadOrCreateTikTokRandomIso(subId: Int): String {
         val prefs = application.getSharedPreferences("sim_config_$subId", Context.MODE_PRIVATE)
-        val existing = prefs.getString(TIKTOK_RANDOM_ISO_PREF_KEY, "")
-            .orEmpty()
-            .filter { it.isDigit() }
-            .take(6)
-        if (existing.length >= 3) return existing
-        val generated = (10000..99999).random().toString()
+        val existing = prefs.getString(TIKTOK_RANDOM_ISO_PREF_KEY, "").orEmpty().filter { it.isDigit() }
+        // Locale region 仅接受 2 位字母或 3 位数字，旧版本的 5 位数字会触发系统应用崩溃。
+        if (existing.length == 3) return existing
+        val generated = (1..999).random().toString().padStart(3, '0')
         prefs.edit { putString(TIKTOK_RANDOM_ISO_PREF_KEY, generated) }
         return generated
     }
