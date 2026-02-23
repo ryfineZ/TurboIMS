@@ -131,12 +131,15 @@ import java.util.Locale
 
 private const val COUNTRY_ISO_OPTION_DEFAULT = "__default__"
 private const val COUNTRY_ISO_OPTION_OTHER = "__other__"
-private const val REPO_URL = "https://github.com/ryfineZ/TurboIMS"
-private const val REPO_ISSUE_URL = "https://github.com/ryfineZ/TurboIMS/issues/new"
+private const val REPO_URL = "https://github.com/ryfineZ/carrier-ims-for-pixel"
+private const val REPO_ISSUE_URL = "https://github.com/ryfineZ/carrier-ims-for-pixel/issues/new"
 private const val REPO_OWNER = "ryfineZ"
-private const val REPO_NAME = "TurboIMS"
-private const val RELEASES_LATEST_API_URL =
-    "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases/latest"
+private const val REPO_NAME = "carrier-ims-for-pixel"
+private const val LEGACY_REPO_NAME = "TurboIMS"
+private val RELEASES_LATEST_API_URLS = listOf(
+    "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases/latest",
+    "https://api.github.com/repos/$REPO_OWNER/$LEGACY_REPO_NAME/releases/latest",
+)
 private const val UPDATE_APK_MIME_TYPE = "application/vnd.android.package-archive"
 private const val UNKNOWN_INSTALLER_SOURCE_SETTINGS_SCHEME = "package:"
 private const val WECHAT_PACKAGE_NAME = "com.tencent.mm"
@@ -1293,49 +1296,58 @@ class MainActivity : BaseActivity() {
 
     private suspend fun fetchLatestReleaseInfo(): Result<ReleaseInfo> {
         return withContext(Dispatchers.IO) {
-            runCatching {
-                val connection = (URL(RELEASES_LATEST_API_URL).openConnection() as HttpURLConnection).apply {
-                    connectTimeout = 10_000
-                    readTimeout = 10_000
-                    requestMethod = "GET"
-                    setRequestProperty("Accept", "application/vnd.github+json")
-                    setRequestProperty("User-Agent", "$REPO_NAME-UpdateChecker")
+            val attempts = mutableListOf<String>()
+            for (apiUrl in RELEASES_LATEST_API_URLS) {
+                val release = runCatching { fetchLatestReleaseInfo(apiUrl) }.getOrNull()
+                if (release != null) {
+                    return@withContext Result.success(release)
                 }
-                try {
-                    val conn = connection
-                    val responseCode = conn.responseCode
-                    if (responseCode !in 200..299) {
-                        throw IllegalStateException("HTTP $responseCode")
+                attempts += apiUrl
+            }
+            Result.failure(IllegalStateException("release fetch failed: ${attempts.joinToString()}"))
+        }
+    }
+
+    private fun fetchLatestReleaseInfo(apiUrl: String): ReleaseInfo {
+        val connection = (URL(apiUrl).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 10_000
+            readTimeout = 10_000
+            requestMethod = "GET"
+            setRequestProperty("Accept", "application/vnd.github+json")
+            setRequestProperty("User-Agent", "$REPO_NAME-UpdateChecker")
+        }
+        try {
+            val responseCode = connection.responseCode
+            if (responseCode !in 200..299) {
+                throw IllegalStateException("HTTP $responseCode")
+            }
+            val body = connection.inputStream.bufferedReader().use { it.readText() }
+            val json = JSONObject(body)
+            val tagName = json.optString("tag_name").ifBlank {
+                json.optString("name")
+            }
+            val releaseNotes = json.optString("body", "")
+            val assets = json.optJSONArray("assets")
+            var apkUrl: String? = null
+            if (assets != null) {
+                for (i in 0 until assets.length()) {
+                    val asset = assets.optJSONObject(i) ?: continue
+                    val url = asset.optString("browser_download_url")
+                    if (url.endsWith(".apk", ignoreCase = true)) {
+                        apkUrl = url
+                        break
                     }
-                    val body = conn.inputStream.bufferedReader().use { it.readText() }
-                    val json = JSONObject(body)
-                    val tagName = json.optString("tag_name").ifBlank {
-                        json.optString("name")
-                    }
-                    val releaseNotes = json.optString("body", "")
-                    val assets = json.optJSONArray("assets")
-                    var apkUrl: String? = null
-                    if (assets != null) {
-                        for (i in 0 until assets.length()) {
-                            val asset = assets.optJSONObject(i) ?: continue
-                            val url = asset.optString("browser_download_url")
-                            if (url.endsWith(".apk", ignoreCase = true)) {
-                                apkUrl = url
-                                break
-                            }
-                        }
-                    }
-                    if (tagName.isBlank()) {
-                        throw IllegalStateException("invalid release tag")
-                    }
-                    if (apkUrl.isNullOrBlank()) {
-                        throw IllegalStateException(getString(R.string.update_no_apk))
-                    }
-                    ReleaseInfo(tagName, apkUrl, releaseNotes)
-                } finally {
-                    connection.disconnect()
                 }
             }
+            if (tagName.isBlank()) {
+                throw IllegalStateException("invalid release tag")
+            }
+            if (apkUrl.isNullOrBlank()) {
+                throw IllegalStateException(getString(R.string.update_no_apk))
+            }
+            return ReleaseInfo(tagName, apkUrl, releaseNotes)
+        } finally {
+            connection.disconnect()
         }
     }
 
@@ -1846,12 +1858,6 @@ fun FeaturesCard(
                     { Feature.entries.indexOf(it) },
                 )
             )
-            Text(
-                text = stringResource(R.string.all_sim_switch_only_desc),
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.outline
-            )
-            Spacer(modifier = Modifier.height(6.dp))
             if (!isSelectAllSim) {
                 val selectedSubId = selectedSim?.subId
                 val checked = selectedSubId != null && imsRegistrationStatusBySubId[selectedSubId] == true
@@ -1995,7 +2001,7 @@ private fun FeatureActionChip(
 
 private fun buildUpdateApkFileName(version: String): String {
     val sanitized = version.replace(Regex("[^0-9A-Za-z._-]"), "_")
-    return "TurboIMS-$sanitized.apk"
+    return "CarrierIMSForPixel-$sanitized.apk"
 }
 
 private data class ParsedVersion(

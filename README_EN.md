@@ -14,8 +14,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ryfineZ/TurboIMS/releases"><img alt="Release" src="https://img.shields.io/github/v/release/ryfineZ/TurboIMS"></a>
-  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/ryfineZ/TurboIMS"></a>
+  <a href="https://github.com/ryfineZ/carrier-ims-for-pixel/releases"><img alt="Release" src="https://img.shields.io/github/v/release/ryfineZ/carrier-ims-for-pixel"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/ryfineZ/carrier-ims-for-pixel"></a>
   <img alt="Platform" src="https://img.shields.io/badge/Platform-Android%2013%2B-3DDC84">
   <img alt="Device" src="https://img.shields.io/badge/Device-Pixel%20Tensor-blue">
   <img alt="Permission" src="https://img.shields.io/badge/Requires-Shizuku-orange">
@@ -52,7 +52,7 @@ Recent improvements include:
 
 ## Quick Start
 
-1. Download APK from [Releases](https://github.com/ryfineZ/TurboIMS/releases)
+1. Download APK from [Releases](https://github.com/ryfineZ/carrier-ims-for-pixel/releases)
 2. Install and start [Shizuku](https://shizuku.rikka.app/)
 3. Open app and grant Shizuku permission
 4. Select SIM and toggle required features
@@ -108,7 +108,7 @@ SIGN_KEY_PASSWORD=***
 ## Changelog
 
 - Full changelog: [CHANGELOG.md](CHANGELOG.md)
-- Releases: [GitHub Releases](https://github.com/ryfineZ/TurboIMS/releases)
+- Releases: [GitHub Releases](https://github.com/ryfineZ/carrier-ims-for-pixel/releases)
 
 ## Credits
 

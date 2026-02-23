@@ -28,7 +28,7 @@
     <string name="all_sim">所有SIM</string>
 
     <!-- Features -->
-    <string name="features_config">本次应用功能列表</string>
+    <string name="features_config">功能开关实时生效</string>
     <string name="tools">工具</string>
     <string name="refresh_short">刷新</string>
     <string name="action_sync_short">同步</string>

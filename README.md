@@ -14,8 +14,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ryfineZ/TurboIMS/releases"><img alt="Release" src="https://img.shields.io/github/v/release/ryfineZ/TurboIMS"></a>
-  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/ryfineZ/TurboIMS"></a>
+  <a href="https://github.com/ryfineZ/carrier-ims-for-pixel/releases"><img alt="Release" src="https://img.shields.io/github/v/release/ryfineZ/carrier-ims-for-pixel"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/ryfineZ/carrier-ims-for-pixel"></a>
   <img alt="Platform" src="https://img.shields.io/badge/Platform-Android%2013%2B-3DDC84">
   <img alt="Device" src="https://img.shields.io/badge/Device-Pixel%20Tensor-blue">
   <img alt="Permission" src="https://img.shields.io/badge/Requires-Shizuku-orange">
@@ -57,7 +57,7 @@
 
 ## 快速开始
 
-1. 从 [Releases](https://github.com/ryfineZ/TurboIMS/releases) 下载并安装 APK  
+1. 从 [Releases](https://github.com/ryfineZ/carrier-ims-for-pixel/releases) 下载并安装 APK  
 2. 安装并启动 [Shizuku](https://shizuku.rikka.app/zh-hans/)  
 3. 打开 App，授权 Shizuku  
 4. 选择 SIM，按需开启功能开关  
@@ -113,7 +113,7 @@ SIGN_KEY_PASSWORD=***
 ## 更新记录
 
 - 详细版本变更见 [CHANGELOG.md](CHANGELOG.md)
-- 历史发布见 [Releases](https://github.com/ryfineZ/TurboIMS/releases)
+- 历史发布见 [Releases](https://github.com/ryfineZ/carrier-ims-for-pixel/releases)
 
 ## 致谢
 
